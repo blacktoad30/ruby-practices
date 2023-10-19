@@ -1,11 +1,9 @@
 #!/usr/bin/env ruby
 
-i = 1
-while i <= 20
+(1..20).each do |i|
   result = ""
-  result = "fizz" if i % 3 == 0
-  result = "#{result}buzz" if i % 5 == 0
+  result = "Fizz" if i % 3 == 0
+  result += "Buzz" if i % 5 == 0
   result = i if result == ""
   puts result
-  i += 1
 end
