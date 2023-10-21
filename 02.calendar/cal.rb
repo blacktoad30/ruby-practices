@@ -10,10 +10,8 @@ month = params["m"].to_i
 #p month, year
 
 today = Date.today
-if year.zero? || month.zero?
-  at_year = if year.zero? then today.year else year end
-  at_month = if month.zero? then today.month else month end
-end
+at_year = if year.zero? then today.year else year end
+at_month = if month.zero? then today.month else month end
 this_monthp = if at_year == today.year && at_month == today.month \
               then true else false end
 #p today, at_month, at_year
