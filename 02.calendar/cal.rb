@@ -10,10 +10,8 @@ month = params["m"].to_i
 #p month, year
 
 today = Date.today
-at_year = if year.zero? then today.year else year end
-at_month = if month.zero? then today.month else month end
-this_monthp = if at_year == today.year && at_month == today.month \
-              then true else false end
+at_year = year.zero? ? today.year : year
+at_month = month.zero? ? today.month : month
 #p today, at_month, at_year
 exit 1 unless (at_month.between?(1, 12) && at_year.between?(1970, 2100))
 at_first_wday = Date.new(at_year, at_month, 1).wday
@@ -24,7 +22,7 @@ mdays.size.times do |weekc|
   next if dayc > at_last_day
   mdays[weekc].size.times do |wd|
     if weekc == 0 && wd >= at_first_wday || weekc > 0 && dayc <= at_last_day
-      if this_monthp && dayc == today.day
+      if at_year == today.year && at_month == today.month && dayc == today.day
         mdays[weekc][wd] = "\e[7m" + dayc.to_s.rjust(2) + "\e[m"
       else
         mdays[weekc][wd] = dayc.to_s.rjust(2)
