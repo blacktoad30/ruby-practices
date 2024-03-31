@@ -14,7 +14,7 @@ def ls_pprint(ary, col)
   return if ary.empty?
 
   matrix(ary, col)
-    .map { |cols| ljusts(cols, max_length(cols) + 1) }
+    .map { |cols| cols.map { |fname| fname.to_s.ljust(max_length(cols) + 1) } }
     .transpose
     .each { |line| puts line.join(' ').sub(/[[:space:]]+$/, '') }
 end
@@ -29,10 +29,6 @@ def matrix(ary, row)
   end
 
   ary.each_slice(col).to_a
-end
-
-def ljusts(ary, max_count)
-  ary.map { |str| str.to_s.ljust(max_count) }
 end
 
 def max_length(ary)
