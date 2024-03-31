@@ -3,4 +3,4 @@
 
 require_relative './lib/ls_methods'
 
-ls_pprint(child_files('.'), 3)
+table_print(child_files('.'), 3)

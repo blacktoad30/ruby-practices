@@ -10,11 +10,11 @@ def dot_file?(fname)
   File.basename(fname).match?(/^\..*/)
 end
 
-def ls_pprint(ary, col)
-  return if ary.empty?
+def table_print(str_list, col)
+  return if str_list.empty?
 
-  matrix(ary, col)
-    .map { |cols| cols.map { |fname| fname.to_s.ljust(max_length(cols) + 1) } }
+  matrix(str_list, col)
+    .map { |cols| cols.map { |elm| elm.to_s.ljust(max_length(cols) + 1) } }
     .transpose
     .each { |line| puts line.join(' ').sub(/[[:space:]]+$/, '') }
 end
@@ -31,8 +31,8 @@ def matrix(ary, row)
   ary.each_slice(col).to_a
 end
 
-def max_length(ary)
-  ary.map { |fname| monofont_width(fname) }.max
+def max_length(str_list)
+  str_list.map { |str| monofont_width(str) }.max
 end
 
 def monofont_width(str)
