@@ -1,9 +1,12 @@
 # frozen_string_literal: true
 
-def child_files(fpath)
-  Dir.children(fpath)
-     .sort
-     .reject { |child| dot_file?(child) }
+def child_files(fpath, export_all: false)
+  if export_all
+    Dir.entries(fpath)
+  else
+    Dir.children(fpath)
+       .reject { |child| dot_file?(child) }
+  end.sort
 end
 
 def dot_file?(fname)
