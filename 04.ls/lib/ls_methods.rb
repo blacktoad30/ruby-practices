@@ -1,8 +1,8 @@
 # frozen_string_literal: true
 
-def child_files(fpath)
+def child_files(fpath, reverse_order: false)
   Dir.children(fpath)
-     .sort
+     .sort { |a, z| reverse_order ? z <=> a : a <=> z }
      .reject { |child| dot_file?(child) }
 end
 
