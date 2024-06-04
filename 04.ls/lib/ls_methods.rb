@@ -25,7 +25,7 @@ def matrix(ary, row)
   col, mod = ary.size.divmod(row)
   if mod.positive?
     col += 1
-    (row - mod).times { ary.push(nil) }
+    ary.concat Array.new((row - mod))
   end
 
   ary.each_slice(col).to_a
