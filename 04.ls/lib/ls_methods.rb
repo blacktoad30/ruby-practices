@@ -24,18 +24,16 @@ def matrix(ary, row)
   ary.each_slice(col).to_a
 end
 
-def adjust_list(list, padding = ' ', align: :left, suffix: '')
+def adjust_list(list, align: :left, suffix: '')
   width = max_length(list)
 
   list.map do |elm|
     str =
       case align
       when :left
-        elm.to_s.ljust(width, padding)
+        elm.to_s.ljust(width, ' ')
       when :right
-        elm.to_s.rjust(width, padding)
-      when :center
-        elm.to_s.center(width, padding)
+        elm.to_s.rjust(width, ' ')
       end
 
     "#{str}#{suffix}"
@@ -50,8 +48,8 @@ def monofont_width(str)
   str.to_s.length + str.to_s.grapheme_clusters.count { |c| !c.ascii_only? }
 end
 
-def print_table(table, sep: ' ')
-  table.each { |line| puts line.join(sep).strip }
+def print_table(table)
+  table.each { |line| puts line.join(' ').strip }
 end
 
 def file_info(fname)
