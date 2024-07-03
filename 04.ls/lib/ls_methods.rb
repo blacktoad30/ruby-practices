@@ -5,11 +5,7 @@ require 'etc'
 def child_files(fpath)
   Dir.children(fpath)
      .sort
-     .reject { |child| dot_file?(child) }
-end
-
-def dot_file?(fname)
-  File.basename(fname).match?(/^\..*/)
+     .reject { |child| child.match?(/^\..*/) }
 end
 
 def matrix(ary, row)
@@ -25,7 +21,7 @@ def matrix(ary, row)
 end
 
 def adjust_list(list, align: :left, suffix: '')
-  width = max_length(list)
+  width = list.map { |elm| monofont_width(elm.to_s) }.max
 
   list.map do |elm|
     str =
@@ -38,10 +34,6 @@ def adjust_list(list, align: :left, suffix: '')
 
     "#{str}#{suffix}"
   end
-end
-
-def max_length(str_list)
-  str_list.map { |str| monofont_width(str) }.max
 end
 
 def monofont_width(str)
