@@ -81,41 +81,49 @@ def total_blocks(entries)
   end
 end
 
-def file_infos(entries)
-  entries.map { |fname| file_info(fname) }
-         .transpose
-         .map
-         .with_index do |lst, idx|
-           case idx
-           when 0, 2, 3
-             adjust_list(lst)
-           when 1, 5
-             adjust_list(lst, align: :right)
-           when 4
-             size_dev =
-               lst.transpose
-                  .select { |col| col.compact.size.positive? }
+FileInfo = Data.define(:mode,
+                       :nlink,
+                       :owner,
+                       :group,
+                       :rdev_major,
+                       :rdev_minor,
+                       :date_time,
+                       :path_name)
 
-             size_dev.map { |col| adjust_list(col, align: :right) }
-                     .transpose
-                     .map { |info| info.join(' ') }
-           else
-             lst
-           end
-         end
-         .transpose
+def file_infos(entries)
+  infos = entries.map { |fname| file_info(fname) }
+
+  table =
+    Enumerator.new do |y|
+      FileInfo.members.each do |info_type|
+        col = infos.map(&info_type)
+
+        next if col.none?
+
+        case info_type
+        when :mode, :owner, :group
+          y << adjust_list(col)
+        when :nlink, :date_time, :rdev_major, :rdev_minor
+          y << adjust_list(col, align: :right)
+        when :path_name
+          y << col
+        end
+      end
+    end
+
+  table.to_a.transpose
 end
 
 def file_info(fname)
   fs = File.lstat(fname)
 
-  [file_mode(fs.ftype, fs.mode),
-   fs.nlink.to_s,
-   Etc.getpwuid(fs.uid).name,
-   Etc.getgrgid(fs.gid).name,
-   file_rdev_or_size(fs),
-   file_modified_date_time(fs.mtime),
-   file_path_name(fs.ftype, fname)]
+  FileInfo.new(file_mode(fs.ftype, fs.mode),
+               fs.nlink.to_s,
+               Etc.getpwuid(fs.uid).name,
+               Etc.getgrgid(fs.gid).name,
+               *file_rdev_or_size(fs),
+               file_modified_date_time(fs.mtime),
+               file_path_name(fs.ftype, fname))
 end
 
 def file_mode(ftype, fmode)
