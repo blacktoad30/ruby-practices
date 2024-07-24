@@ -14,34 +14,26 @@ end
 
 def child_files(fpath)
   Dir.children(fpath)
-     .sort
      .reject { |child| child.match?(/^\..*/) }
+     .sort
 end
 
 def tabulate_file_names(entries, column)
   table = matrix(entries, column)
 
-  table.map
-       .with_index do |col, i|
-         if i < col.size - 1
-           adjust_list(col, suffix: ' ')
-         else
-           col
-         end
-       end
+  table.shift(table.size - 1)
+       .map { |col| adjust_list(col, suffix: ' ') }
+       .push(*table)
        .transpose
 end
 
 def matrix(ary, row)
   return ary if ary.empty?
 
-  col, mod = ary.size.divmod(row)
-  if mod.positive?
-    col += 1
-    ary.concat Array.new((row - mod))
-  end
+  col = ary.size.quo(row).ceil
+  pad = row * col - ary.size
 
-  ary.each_slice(col).to_a
+  (ary + Array.new(pad)).each_slice(col).to_a
 end
 
 def adjust_list(list, align: :left, suffix: '')
@@ -69,16 +61,7 @@ def print_table(table)
 end
 
 def total_blocks(entries)
-  entries.map.sum do |fname|
-    fs =
-      if File.ftype(fname) == 'link'
-        File.lstat(fname)
-      else
-        File.stat(fname)
-      end
-
-    fs.blocks.ceildiv(2)
-  end
+  entries.map(&File.method(:lstat)).sum(&:blocks).ceildiv(2)
 end
 
 FileInfo = Data.define(:mode,
@@ -146,18 +129,17 @@ end
 MOD_X = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
 
 def entry_perm(fmode)
-  fm = fmode.to_s(8).slice(/[0-7]{4}$/)
-  st_prot = fm[0].to_i
-  fperm =
-    fm[1..3].chars.map.with_index do |mod, idx|
-      m = mod.to_i
+  fm = fmode.to_s(8).slice(/[0-7]{4}$/).chars.map(&:to_i)
+  st_prot = fm.shift
 
-      [(m[2].zero? ? '-' : 'r'),
-       (m[1].zero? ? '-' : 'w'),
-       (MOD_X[idx]["#{st_prot[2 - idx]}#{m[0]}".to_i(2)])]
-    end
+  fm.each_with_index.inject('') do |result, (mod, idx)|
+    exec_type = "#{st_prot[2 - idx]}#{mod[0]}".to_i(2)
 
-  fperm.join
+    result +
+      (mod[2].zero? ? '-' : 'r') +
+      (mod[1].zero? ? '-' : 'w') +
+      (MOD_X[idx][exec_type])
+  end
 end
 
 def file_rdev_or_size(file_stat)
