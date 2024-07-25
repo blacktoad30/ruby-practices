@@ -19,7 +19,7 @@ def child_files(fpath)
 end
 
 def tabulate_file_names(entries, column)
-  table = matrix(entries, column)
+  table = split_list_into_rows(entries, column)
 
   table.shift(table.size - 1)
        .map { |col| adjust_list(col, suffix: ' ') }
@@ -27,7 +27,7 @@ def tabulate_file_names(entries, column)
        .transpose
 end
 
-def matrix(ary, row)
+def split_list_into_rows(ary, row)
   return ary if ary.empty?
 
   col = ary.size.quo(row).ceil
@@ -110,13 +110,13 @@ def file_info(fname)
 end
 
 def file_mode(ftype, fmode)
-  file_type = entry_type(ftype)
-  file_perm = entry_perm(fmode)
+  file_type = file_type_char(ftype)
+  file_perm = file_permission(fmode)
 
   "#{file_type}#{file_perm}"
 end
 
-def entry_type(ftype)
+def file_type_char(ftype)
   case ftype
   when 'file' then '-'
   when 'fifo' then 'p'
@@ -126,9 +126,9 @@ def entry_type(ftype)
   end
 end
 
-MOD_X = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
+FILE_MODE_EXEC = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
 
-def entry_perm(fmode)
+def file_permission(fmode)
   fm = fmode.to_s(8).slice(/[0-7]{4}$/).chars.map(&:to_i)
   st_prot = fm.shift
 
@@ -138,7 +138,7 @@ def entry_perm(fmode)
     result +
       (mod[2].zero? ? '-' : 'r') +
       (mod[1].zero? ? '-' : 'w') +
-      (MOD_X[idx][exec_type])
+      (FILE_MODE_EXEC[idx][exec_type])
   end
 end
 
