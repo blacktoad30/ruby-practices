@@ -12,14 +12,14 @@ def main(argv)
   print_table(table)
 end
 
-def child_files(fpath)
-  Dir.children(fpath)
-     .reject { |child| child.match?(/^\..*/) }
+def child_files(path)
+  Dir.children(path)
+     .reject { |file| file.match?(/^\..*/) }
      .sort
 end
 
-def tabulate_file_names(entries, column)
-  table = split_list_into_rows(entries, column)
+def tabulate_file_names(files, column)
+  table = split_list_into_rows(files, column)
 
   table.shift(table.size - 1)
        .map { |col| adjust_list(col, suffix: ' ') }
@@ -27,13 +27,13 @@ def tabulate_file_names(entries, column)
        .transpose
 end
 
-def split_list_into_rows(ary, row)
-  return ary if ary.empty?
+def split_list_into_rows(list, row)
+  return list if list.empty?
 
-  col = ary.size.quo(row).ceil
-  pad = row * col - ary.size
+  col = list.size.quo(row).ceil
+  pad = row * col - list.size
 
-  (ary + Array.new(pad)).each_slice(col).to_a
+  (list + Array.new(pad)).each_slice(col).to_a
 end
 
 def adjust_list(list, align: :left, suffix: '')
@@ -57,11 +57,11 @@ def monofont_width(str)
 end
 
 def print_table(table)
-  table.each { |line| puts line.join(' ').strip }
+  table.each { |row| puts row.join(' ').strip }
 end
 
-def total_blocks(entries)
-  entries.map(&File.method(:lstat)).sum(&:blocks).ceildiv(2)
+def total_blocks(files)
+  files.map(&File.method(:lstat)).sum(&:blocks).ceildiv(2)
 end
 
 FileInfo = Data.define(:mode,
@@ -73,8 +73,8 @@ FileInfo = Data.define(:mode,
                        :date_time,
                        :path_name)
 
-def file_infos(entries)
-  infos = entries.map { |fname| file_info(fname) }
+def file_infos(files)
+  infos = files.map { |file| file_info(file) }
 
   table =
     Enumerator.new do |y|
@@ -97,48 +97,48 @@ def file_infos(entries)
   table.to_a.transpose
 end
 
-def file_info(fname)
-  fs = File.lstat(fname)
+def file_info(path)
+  stat = File.lstat(path)
 
-  FileInfo.new(file_mode(fs.ftype, fs.mode),
-               fs.nlink.to_s,
-               Etc.getpwuid(fs.uid).name,
-               Etc.getgrgid(fs.gid).name,
-               *file_rdev_or_size(fs),
-               file_modified_date_time(fs.mtime),
-               file_path_name(fs.ftype, fname))
+  FileInfo.new(file_mode(stat.ftype, stat.mode),
+               stat.nlink.to_s,
+               Etc.getpwuid(stat.uid).name,
+               Etc.getgrgid(stat.gid).name,
+               *file_rdev_or_size(stat),
+               file_modified_date_time(stat.mtime),
+               file_path_name(stat.ftype, path))
 end
 
-def file_mode(ftype, fmode)
-  file_type = file_type_char(ftype)
-  file_perm = file_permission(fmode)
+def file_mode(file_type, file_mode)
+  type = file_type_char(file_type)
+  permission = file_permission(file_mode)
 
-  "#{file_type}#{file_perm}"
+  "#{type}#{permission}"
 end
 
-def file_type_char(ftype)
-  case ftype
+def file_type_char(file_type)
+  case file_type
   when 'file' then '-'
   when 'fifo' then 'p'
   when 'unknown' then '?'
   else
-    ftype.slice(0)
+    file_type.slice(0)
   end
 end
 
 FILE_MODE_EXEC = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
 
-def file_permission(fmode)
-  fm = fmode.to_s(8).slice(/[0-7]{4}$/).chars.map(&:to_i)
-  st_prot = fm.shift
+def file_permission(file_mode)
+  octal_mode = file_mode.to_s(8).slice(/[0-7]{4}$/).chars.map(&:to_i)
+  protect_bits = octal_mode.shift
 
-  fm.each_with_index.inject('') do |result, (mod, idx)|
-    exec_type = "#{st_prot[2 - idx]}#{mod[0]}".to_i(2)
+  octal_mode.each_with_index.inject('') do |result, (mode, i)|
+    exec_type = "#{protect_bits[2 - i]}#{mode[0]}".to_i(2)
 
     result +
-      (mod[2].zero? ? '-' : 'r') +
-      (mod[1].zero? ? '-' : 'w') +
-      (FILE_MODE_EXEC[idx][exec_type])
+      (mode[2].zero? ? '-' : 'r') +
+      (mode[1].zero? ? '-' : 'w') +
+      (FILE_MODE_EXEC[i][exec_type])
   end
 end
 
