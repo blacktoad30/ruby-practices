@@ -73,7 +73,7 @@ case ${ls_islongfmt:-0} in
       tee "$test_dir/.ruby-ls.0.fifo" "$test_dir/.ruby-ls.1.fifo" >/dev/null &
     fi
 
-  LC_ALL=C ${cmd_ls} -C -w$(max_width 1 <"$test_dir/.ruby-ls.1.fifo") |
+  LC_ALL=C ${cmd_ls} -C -w$(max_width "${ext_width:-1}" <"$test_dir/.ruby-ls.1.fifo") |
     expand -t8 |
     diff -u - "$test_dir/.ruby-ls.0.fifo"
   ;;
