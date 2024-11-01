@@ -3,6 +3,18 @@
 require 'optparse'
 require 'etc'
 
+FileInfo =
+  Data.define(:mode, :nlink, :owner, :group, :rdev_major, :rdev_minor,
+              :date_time, :path_name)
+
+FILE_MODE_EXEC = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
+
+TIME_NOW = Time.now
+# AVERAGE_SECONDS_IN_A_GREGORIAN_YEAR =
+#   (365 + 97r / 400) * 24 * 60 * 60 # => (31556952/1)
+SIX_MONTHS_AGO =
+  Time.at(TIME_NOW.tv_sec - 31_556_952 / 2, TIME_NOW.tv_nsec, :nsec)
+
 def main(argv)
   opts = argv.getopts('alr')
   files = child_files('.', all: opts['a'], reverse: opts['r'])
@@ -73,15 +85,6 @@ def total_blocks(files)
   files.map(&File.method(:lstat)).sum(&:blocks).ceildiv(2)
 end
 
-FileInfo = Data.define(:mode,
-                       :nlink,
-                       :owner,
-                       :group,
-                       :rdev_major,
-                       :rdev_minor,
-                       :date_time,
-                       :path_name)
-
 def file_infos(files)
   infos = files.map { |file| file_info(file) }
 
@@ -135,8 +138,6 @@ def file_type_char(file_type)
   end
 end
 
-FILE_MODE_EXEC = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
-
 def file_permission(file_mode)
   octal_mode = file_mode.to_s(8).slice(/[0-7]{4}$/).chars.map(&:to_i)
   protect_bits = octal_mode.shift
@@ -158,12 +159,6 @@ def file_rdev_or_size(file_stat)
     [nil, file_stat.size.to_s]
   end
 end
-
-TIME_NOW = Time.now
-# AVERAGE_SECONDS_IN_A_GREGORIAN_YEAR =
-#   (365 + 97r / 400) * 24 * 60 * 60 # => (31556952/1)
-SIX_MONTHS_AGO =
-  Time.at(TIME_NOW.tv_sec - 31_556_952 / 2, TIME_NOW.tv_nsec, :nsec)
 
 def file_modified_date_time(modified_time)
   if modified_time < SIX_MONTHS_AGO
