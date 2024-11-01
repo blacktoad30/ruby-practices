@@ -15,8 +15,8 @@ TIME_NOW = Time.now
 SIX_MONTHS_AGO =
   Time.at(TIME_NOW.tv_sec - 31_556_952 / 2, TIME_NOW.tv_nsec, :nsec)
 
-def main(argv)
-  opts = argv.getopts('alr')
+def main(args)
+  opts = args.getopts('alr')
   files = child_files('.', all: opts['a'], reverse: opts['r'])
   table = opts['l'] ? file_infos(files) : tabulate_file_names(files, 3)
 
@@ -39,34 +39,34 @@ def child_files(path, all: false, reverse: false)
   end
 end
 
-def tabulate_file_names(files, column)
-  table = split_list_into_rows(files, column)
+def tabulate_file_names(files, column_size)
+  table = tabulate_list_by_row_size(files, column_size)
 
   table.shift(table.size - 1)
-       .map { |col| adjust_list(col, suffix: ' ') }
+       .map { |column_fields| adjust_strings(column_fields, suffix: ' ') }
        .push(*table)
        .transpose
 end
 
-def split_list_into_rows(list, row)
+def tabulate_list_by_row_size(list, row_size)
   return list if list.empty?
 
-  col = list.size.quo(row).ceil
-  pad = row * col - list.size
+  column_size = list.size.quo(row_size).ceil
+  padding_size = row_size * column_size - list.size
 
-  (list + Array.new(pad)).each_slice(col).to_a
+  (list + Array.new(padding_size)).each_slice(column_size).to_a
 end
 
-def adjust_list(list, align: :left, suffix: '')
-  width = list.map { |elm| monofont_width(elm.to_s) }.max
+def adjust_strings(strings, align: :left, suffix: '')
+  width = strings.map { |str| monofont_width(str.to_s) }.max
 
-  list.map do |elm|
+  strings.map do |str|
     str =
       case align
       when :left
-        elm.to_s.ljust(width, ' ')
+        str.to_s.ljust(width, ' ')
       when :right
-        elm.to_s.rjust(width, ' ')
+        str.to_s.rjust(width, ' ')
       end
 
     "#{str}#{suffix}"
@@ -78,7 +78,7 @@ def monofont_width(str)
 end
 
 def print_table(table)
-  table.each { |row| puts row.join(' ').strip }
+  table.each { |row_fields| puts row_fields.join(' ').strip }
 end
 
 def total_blocks(files)
@@ -91,17 +91,17 @@ def file_infos(files)
   table =
     Enumerator.new do |y|
       FileInfo.members.each do |info_type|
-        col = infos.map(&info_type)
+        each_info_type_values = infos.map(&info_type)
 
-        next if col.none?
+        next if each_info_type_values.none?
 
         case info_type
         when :mode, :owner, :group
-          y << adjust_list(col)
+          y << adjust_strings(each_info_type_values)
         when :nlink, :date_time, :rdev_major, :rdev_minor
-          y << adjust_list(col, align: :right)
+          y << adjust_strings(each_info_type_values, align: :right)
         when :path_name
-          y << col
+          y << each_info_type_values
         end
       end
     end
