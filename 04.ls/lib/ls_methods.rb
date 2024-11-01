@@ -16,7 +16,7 @@ SIX_MONTHS_AGO =
   Time.at(TIME_NOW.tv_sec - 31_556_952 / 2, TIME_NOW.tv_nsec, :nsec)
 
 def main(args)
-  opts = args.getopts('alr')
+  opts = OptionParser.new.getopts(args, 'alr')
   files = child_files('.', all: opts['a'], reverse: opts['r'])
   table = opts['l'] ? file_infos(files) : tabulate_file_names(files, 3)
 
@@ -51,7 +51,7 @@ end
 def tabulate_list_by_row_size(list, row_size)
   return list if list.empty?
 
-  column_size = list.size.quo(row_size).ceil
+  column_size = list.size.ceildiv(row_size)
   padding_size = row_size * column_size - list.size
 
   (list + Array.new(padding_size)).each_slice(column_size).to_a
@@ -61,13 +61,7 @@ def adjust_strings(strings, align: :left, suffix: '')
   width = strings.map { |str| monofont_width(str.to_s) }.max
 
   strings.map do |str|
-    str =
-      case align
-      when :left
-        str.to_s.ljust(width, ' ')
-      when :right
-        str.to_s.rjust(width, ' ')
-      end
+    str = adjust_string(str, width, align:)
 
     "#{str}#{suffix}"
   end
@@ -77,12 +71,21 @@ def monofont_width(str)
   str.to_s.length + str.to_s.grapheme_clusters.count { |c| !c.ascii_only? }
 end
 
+def adjust_string(str, width, align: :left)
+  case align
+  when :left
+    str.to_s.ljust(width, ' ')
+  when :right
+    str.to_s.rjust(width, ' ')
+  end
+end
+
 def print_table(table)
   table.each { |row_fields| puts row_fields.join(' ').strip }
 end
 
 def total_blocks(files)
-  files.map(&File.method(:lstat)).sum(&:blocks).ceildiv(2)
+  files.sum { |file| File.lstat(file).blocks }.ceildiv(2)
 end
 
 def file_infos(files)
