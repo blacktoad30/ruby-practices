@@ -4,18 +4,27 @@ require 'optparse'
 require 'etc'
 
 def main(argv)
-  opts = argv.getopts('l')
-  files = child_files('.')
+  opts = argv.getopts('alr')
+  files = child_files('.', all: opts['a'], reverse: opts['r'])
   table = opts['l'] ? file_infos(files) : tabulate_file_names(files, 3)
 
   puts "total #{total_blocks(files)}" if opts['l']
   print_table(table)
 end
 
-def child_files(path)
-  Dir.children(path)
-     .reject { |file| file.match?(/^\..*/) }
-     .sort
+def child_files(path, all: false, reverse: false)
+  filenames =
+    if all
+      Dir.children(path).unshift('.', '..')
+    else
+      Dir.children(path).delete_if { |file| file.match?(/^\..*/) }
+    end
+
+  if reverse
+    filenames.sort!.reverse!
+  else
+    filenames.sort!
+  end
 end
 
 def tabulate_file_names(files, column)
