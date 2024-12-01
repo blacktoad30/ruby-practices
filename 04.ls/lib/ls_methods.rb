@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require 'optparse'
+require 'reline'
 require 'etc'
 
 FileInfo =
@@ -43,7 +44,7 @@ def tabulate_file_names(files, column_size)
   table = tabulate_list_by_row_size(files, column_size)
 
   table.shift(table.size - 1)
-       .map { |column_fields| adjust_strings(column_fields, suffix: ' ') }
+       .map! { |column_fields| adjust_strings(column_fields, suffix: ' ') }
        .push(*table)
        .transpose
 end
@@ -58,7 +59,8 @@ def tabulate_list_by_row_size(list, row_size)
 end
 
 def adjust_strings(strings, align: :left, suffix: '')
-  width = strings.map { |str| monofont_width(str.to_s) }.max
+  max_width_string = strings.max_by { |str| string_width(str) }
+  width = string_width(max_width_string)
 
   strings.map do |str|
     str = adjust_string(str, width, align:)
@@ -67,8 +69,8 @@ def adjust_strings(strings, align: :left, suffix: '')
   end
 end
 
-def monofont_width(str)
-  str.to_s.length + str.to_s.grapheme_clusters.count { |c| !c.ascii_only? }
+def string_width(str)
+  str.ascii_only? ? str.size : Reline::Unicode.calculate_width(str)
 end
 
 def adjust_string(str, width, align: :left)
