@@ -1,77 +1,94 @@
 # frozen_string_literal: true
 
 require 'optparse'
+require 'reline'
 require 'etc'
 
-def main(argv)
-  opts = argv.getopts('l')
-  files = child_files('.')
+FileInfo =
+  Data.define(:mode, :nlink, :owner, :group, :rdev_major, :rdev_minor,
+              :date_time, :path_name)
+
+FILE_MODE_EXEC = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
+
+TIME_NOW = Time.now
+# AVERAGE_SECONDS_IN_A_GREGORIAN_YEAR =
+#   (365 + 97r / 400) * 24 * 60 * 60 # => (31556952/1)
+SIX_MONTHS_AGO =
+  Time.at(TIME_NOW.tv_sec - 31_556_952 / 2, TIME_NOW.tv_nsec, :nsec)
+
+def main(args)
+  opts = OptionParser.new.getopts(args, 'alr')
+  files = child_files('.', all: opts['a'], reverse: opts['r'])
   table = opts['l'] ? file_infos(files) : tabulate_file_names(files, 3)
 
   puts "total #{total_blocks(files)}" if opts['l']
   print_table(table)
 end
 
-def child_files(path)
-  Dir.children(path)
-     .reject { |file| file.match?(/^\..*/) }
-     .sort
+def child_files(path, all: false, reverse: false)
+  filenames =
+    if all
+      Dir.children(path).unshift('.', '..')
+    else
+      Dir.children(path).delete_if { |file| file.match?(/^\..*/) }
+    end
+
+  if reverse
+    filenames.sort!.reverse!
+  else
+    filenames.sort!
+  end
 end
 
-def tabulate_file_names(files, column)
-  table = split_list_into_rows(files, column)
+def tabulate_file_names(files, column_size)
+  table = tabulate_list_by_row_size(files, column_size)
 
   table.shift(table.size - 1)
-       .map { |col| adjust_list(col, suffix: ' ') }
+       .map! { |column_fields| adjust_strings(column_fields, suffix: ' ') }
        .push(*table)
        .transpose
 end
 
-def split_list_into_rows(list, row)
+def tabulate_list_by_row_size(list, row_size)
   return list if list.empty?
 
-  col = list.size.quo(row).ceil
-  pad = row * col - list.size
+  column_size = list.size.ceildiv(row_size)
+  padding_size = row_size * column_size - list.size
 
-  (list + Array.new(pad)).each_slice(col).to_a
+  (list + Array.new(padding_size)).each_slice(column_size).to_a
 end
 
-def adjust_list(list, align: :left, suffix: '')
-  width = list.map { |elm| monofont_width(elm.to_s) }.max
+def adjust_strings(strings, align: :left, suffix: '')
+  max_width_string = strings.max_by { |str| string_width(str) }
+  width = string_width(max_width_string)
 
-  list.map do |elm|
-    str =
-      case align
-      when :left
-        elm.to_s.ljust(width, ' ')
-      when :right
-        elm.to_s.rjust(width, ' ')
-      end
+  strings.map do |str|
+    str = adjust_string(str, width, align:)
 
     "#{str}#{suffix}"
   end
 end
 
-def monofont_width(str)
-  str.to_s.length + str.to_s.grapheme_clusters.count { |c| !c.ascii_only? }
+def string_width(str)
+  str.ascii_only? ? str.size : Reline::Unicode.calculate_width(str)
+end
+
+def adjust_string(str, width, align: :left)
+  case align
+  when :left
+    str.to_s.ljust(width, ' ')
+  when :right
+    str.to_s.rjust(width, ' ')
+  end
 end
 
 def print_table(table)
-  table.each { |row| puts row.join(' ').strip }
+  table.each { |row_fields| puts row_fields.join(' ').strip }
 end
 
 def total_blocks(files)
-  files.map(&File.method(:lstat)).sum(&:blocks).ceildiv(2)
+  files.sum { |file| File.lstat(file).blocks }.ceildiv(2)
 end
-
-FileInfo = Data.define(:mode,
-                       :nlink,
-                       :owner,
-                       :group,
-                       :rdev_major,
-                       :rdev_minor,
-                       :date_time,
-                       :path_name)
 
 def file_infos(files)
   infos = files.map { |file| file_info(file) }
@@ -79,17 +96,17 @@ def file_infos(files)
   table =
     Enumerator.new do |y|
       FileInfo.members.each do |info_type|
-        col = infos.map(&info_type)
+        each_info_type_values = infos.map(&info_type)
 
-        next if col.none?
+        next if each_info_type_values.none?
 
         case info_type
         when :mode, :owner, :group
-          y << adjust_list(col)
+          y << adjust_strings(each_info_type_values)
         when :nlink, :date_time, :rdev_major, :rdev_minor
-          y << adjust_list(col, align: :right)
+          y << adjust_strings(each_info_type_values, align: :right)
         when :path_name
-          y << col
+          y << each_info_type_values
         end
       end
     end
@@ -126,8 +143,6 @@ def file_type_char(file_type)
   end
 end
 
-FILE_MODE_EXEC = [%w[- x S s], %w[- x S s], %w[- x T t]].freeze
-
 def file_permission(file_mode)
   octal_mode = file_mode.to_s(8).slice(/[0-7]{4}$/).chars.map(&:to_i)
   protect_bits = octal_mode.shift
@@ -149,12 +164,6 @@ def file_rdev_or_size(file_stat)
     [nil, file_stat.size.to_s]
   end
 end
-
-TIME_NOW = Time.now
-# AVERAGE_SECONDS_IN_A_GREGORIAN_YEAR =
-#   (365 + 97r / 400) * 24 * 60 * 60 # => (31556952/1)
-SIX_MONTHS_AGO =
-  Time.at(TIME_NOW.tv_sec - 31_556_952 / 2, TIME_NOW.tv_nsec, :nsec)
 
 def file_modified_date_time(modified_time)
   if modified_time < SIX_MONTHS_AGO
