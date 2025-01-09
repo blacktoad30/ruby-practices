@@ -1,0 +1,53 @@
+---
+- args: []
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym word
+    - !ruby/sym byte
+  operands: []
+- args: ["-l"]
+  print_opts:
+    - !ruby/sym newline
+  operands: []
+- args: ["-w"]
+  print_opts:
+    - !ruby/sym word
+  operands: []
+- args: ["-c"]
+  print_opts:
+    - !ruby/sym byte
+  operands: []
+- args: ["-lw"]
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym word
+  operands: []
+- args: ["-l", "-w"]
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym word
+  operands: []
+- args: ["./data/wc_parse_args.yaml"]
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym word
+    - !ruby/sym byte
+    - !ruby/sym path
+  operands: ["./data/wc_parse_args.yaml"]
+- args: ["-l", "./data/wc_parse_args.yaml"]
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym path
+  operands: ["./data/wc_parse_args.yaml"]
+- args: ["-lw", "./data/wc_parse_args.yaml"]
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym word
+    - !ruby/sym path
+  operands: ["./data/wc_parse_args.yaml"]
+- args: ["-l", "-w", "./data/wc_parse_args.yaml"]
+  print_opts:
+    - !ruby/sym newline
+    - !ruby/sym word
+    - !ruby/sym path
+  operands: ["./data/wc_parse_args.yaml"]
