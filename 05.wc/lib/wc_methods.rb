@@ -58,7 +58,7 @@ def wc_results_by_type_with_errno(paths)
   rescue Errno::EISDIR => e
     errno = 1
     { newline: 0, word: 0, byte: 0,
-      message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}", path: path }
+      path: path, message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
   rescue SystemCallError => e
     errno = 1
     { message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
@@ -90,14 +90,14 @@ end
 
 def wc_total_count_by_type(results_by_type)
   total_count_by_type = { newline: 0, word: 0, byte: 0, path: 'total' }
-  counts_by_type = wc_extract_count_values_by_type(results_by_type)
+  counts_by_type = wc_extract_count_by_type(results_by_type)
 
   total_count_by_type.merge!(*counts_by_type) do |_key, total, count|
     total + count
   end
 end
 
-def wc_extract_count_values_by_type(results_by_type)
+def wc_extract_count_by_type(results_by_type)
   results_by_type.filter_map do |result_by_type|
     count_by_type = result_by_type.slice(*%i[newline word byte])
     count_by_type.empty? ? nil : count_by_type
