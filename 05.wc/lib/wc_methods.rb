@@ -2,23 +2,22 @@
 
 require 'optparse'
 
-WordCountData =
-  Data.define(:paths) do
-    attr_reader(:errno, :results_by_type, :total_count_by_type)
+WordCountData = Data.define(:paths) do
+  attr_reader(:errno, :results_by_type, :total_count_by_type)
 
-    def initialize(paths:)
-      @results_by_type, @errno = wc_results_by_type_with_errno(paths)
+  def initialize(paths:)
+    @results_by_type, @errno = wc_results_by_type_with_errno(paths)
 
-      @total_count_by_type = wc_total_count_by_type(@results_by_type)
+    @total_count_by_type = wc_total_count_by_type(@results_by_type)
 
-      super
-    end
-
-    def regular_files_only?
-      paths.all? { |path| path != '-' && FileTest.file?(path) } &&
-        !paths.empty?
-    end
+    super
   end
+
+  def regular_files_only?
+    paths.all? { |path| path != '-' && FileTest.file?(path) } &&
+      !paths.empty?
+  end
+end
 
 def main(args)
   print_opts, paths = wc_parse_args(args)
@@ -57,8 +56,8 @@ def wc_results_by_type_with_errno(paths)
     (path == '-' || IO.read(path)) && wc_count_by_type(path)
   rescue Errno::EISDIR => e
     errno = 1
-    { newline: 0, word: 0, byte: 0,
-      path: path, message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
+    { newline: 0, word: 0, byte: 0, path: path,
+      message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
   rescue SystemCallError => e
     errno = 1
     { message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
