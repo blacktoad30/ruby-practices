@@ -62,17 +62,34 @@ def wc_results_with_errno(paths)
 
   return [[wc_result('-')], errno] if paths.empty?
 
-  results = paths.map do |path|
-    (path == '-' || IO.read(path)) && wc_result(path)
+  errno = wc_readable_inputs?(paths) ? 0 : 1
+
+  results = wc_results(paths)
+
+  [results, errno]
+end
+
+def wc_readable_inputs?(paths)
+  paths.all? do |path|
+    wc_readable_input?(path)
+  rescue SystemCallError
+    false
+  end
+end
+
+def wc_readable_input?(path)
+  path == '-' || IO.read(path)
+end
+
+def wc_results(paths)
+  paths.lazy.map do |path|
+    wc_readable_input?(path) && wc_result(path)
   rescue SystemCallError => e
-    errno = 1
     count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
     message = e.message.gsub(/ @ .*$/, '')
 
     WcResult.new(path:, count:, message:)
   end
-
-  [results, errno]
 end
 
 def wc_result(valid_path)
@@ -111,7 +128,8 @@ def wc_print(print_opts, data_wc)
   padding_width = wc_padding_width(print_opts, data_wc)
   data_wc_results = data_wc.results.dup
 
-  data_wc.paths.size >= 2 && data_wc_results.push(data_wc.total)
+  data_wc.paths.size >= 2 &&
+    data_wc_results = data_wc_results.chain([data_wc.total])
 
   data_wc_results.each do |data_wc_result|
     wc_warn(**data_wc_result.deconstruct_keys(%i[path message])) if data_wc_result.message
