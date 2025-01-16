@@ -2,7 +2,7 @@
 
 require 'optparse'
 
-WcInfo = Data.define(:paths) do
+Wc = Data.define(:paths) do
   attr_reader(:errno, :results, :total)
 
   def initialize(paths:)
@@ -34,9 +34,9 @@ end
 def main(args)
   print_opts, paths = wc_parse_args(args)
 
-  data_wc_info = WcInfo.new(paths)
+  data_wc = Wc.new(paths)
 
-  wc_print(print_opts, data_wc_info)
+  wc_print(print_opts, data_wc)
 end
 
 def wc_parse_args(args)
@@ -107,11 +107,11 @@ def wc_total(results)
   WcResult.new(path: 'total', count: WcCount.new(**total_count_by_type))
 end
 
-def wc_print(print_opts, data_wc_info)
-  padding_width = wc_padding_width(print_opts, data_wc_info)
-  data_wc_results = data_wc_info.results.dup
+def wc_print(print_opts, data_wc)
+  padding_width = wc_padding_width(print_opts, data_wc)
+  data_wc_results = data_wc.results.dup
 
-  data_wc_info.paths.size >= 2 && data_wc_results.push(data_wc_info.total)
+  data_wc.paths.size >= 2 && data_wc_results.push(data_wc.total)
 
   data_wc_results.each do |data_wc_result|
     wc_warn(**data_wc_result.deconstruct_keys(%i[path message])) if data_wc_result.message
@@ -124,13 +124,13 @@ def wc_print(print_opts, data_wc_info)
   data.wc_info.errno
 end
 
-def wc_padding_width(print_opts, data_wc_info)
+def wc_padding_width(print_opts, data_wc)
   base = 1
 
-  return base if wc_simple_output?(print_opts, data_wc_info.paths)
+  return base if wc_simple_output?(print_opts, data_wc.paths)
 
-  base = 7 if wc_include_non_regular_files?(data_wc_info.paths)
-  total_bytes_digit = data_wc_info.total.count.byte.to_s.size
+  base = 7 if wc_include_non_regular_files?(data_wc.paths)
+  total_bytes_digit = data_wc.total.count.byte.to_s.size
 
   total_bytes_digit >= base ? total_bytes_digit : base
 end
