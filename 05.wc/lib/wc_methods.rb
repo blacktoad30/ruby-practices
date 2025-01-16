@@ -121,7 +121,7 @@ def wc_print(print_opts, data_wc)
     puts wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
   end
 
-  data.wc_info.errno
+  data_wc.errno
 end
 
 def wc_padding_width(print_opts, data_wc)
