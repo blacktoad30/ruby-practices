@@ -2,31 +2,41 @@
 
 require 'optparse'
 
-WordCountData = Data.define(:paths) do
-  attr_reader(:errno, :results_by_type, :total_count_by_type)
+WcInfo = Data.define(:paths) do
+  attr_reader(:errno, :results, :total)
 
   def initialize(paths:)
-    @results_by_type, @errno = wc_results_by_type_with_errno(paths)
+    @results, @errno = wc_results_with_errno(paths)
 
-    @total_count_by_type = wc_total_count_by_type(@results_by_type)
+    @total = wc_total(@results)
 
     super
   end
+end
 
-  def regular_files_only?
-    paths.all? { |path| path != '-' && FileTest.file?(path) } &&
-      !paths.empty?
+WcResult = Data.define(*%i[path count message]) do
+  def initialize(path:, count: nil, message: nil)
+    unless count || message
+      raise(ArgumentError,
+            'missing keywords: count: or message:')
+    end
+
+    super
+  end
+end
+
+WcCount = Data.define(*%i[newline word byte]) do
+  def initialize(newline: 0, word: 0, byte: 0)
+    super
   end
 end
 
 def main(args)
   print_opts, paths = wc_parse_args(args)
 
-  word_count_data = WordCountData.new(paths)
+  data_wc_info = WcInfo.new(paths)
 
-  wc_print(print_opts, word_count_data)
-
-  word_count_data.errno
+  wc_print(print_opts, data_wc_info)
 end
 
 def wc_parse_args(args)
@@ -47,35 +57,34 @@ def wc_parse_args(args)
   [print_opts, copy_args]
 end
 
-def wc_results_by_type_with_errno(paths)
+def wc_results_with_errno(paths)
   errno = 0
 
-  return [[wc_count_by_type('-')], errno] if paths.empty?
+  return [[wc_result('-')], errno] if paths.empty?
 
-  results_by_type = paths.map do |path|
-    (path == '-' || IO.read(path)) && wc_count_by_type(path)
-  rescue Errno::EISDIR => e
-    errno = 1
-    { newline: 0, word: 0, byte: 0, path: path,
-      message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
+  results = paths.map do |path|
+    (path == '-' || IO.read(path)) && wc_result(path)
   rescue SystemCallError => e
     errno = 1
-    { message: "wc: #{path}: #{e.message.gsub(/ @ .*$/, '')}" }
+    count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
+    message = e.message.gsub(/ @ .*$/, '')
+
+    WcResult.new(path:, count:, message:)
   end
 
-  [results_by_type, errno]
+  [results, errno]
 end
 
-def wc_count_by_type(valid_path)
+def wc_result(valid_path)
   fd = valid_path == '-' ? $stdin.fileno : IO.sysopen(valid_path.to_s)
 
-  count_by_type =
-    IO.open(fd) { |io| wc_count_by_type_from_io(io.set_encoding('ASCII-8BIT')) }
+  count =
+    IO.open(fd) { |io| wc_count_from_io(io.set_encoding('ASCII-8BIT')) }
 
-  count_by_type.merge!({ path: valid_path.to_s })
+  WcResult.new(path: valid_path.to_s, count:)
 end
 
-def wc_count_by_type_from_io(io)
+def wc_count_from_io(io)
   count_by_type = { newline: 0, word: 0, byte: 0 }
 
   io.each do |bytes|
@@ -84,76 +93,74 @@ def wc_count_by_type_from_io(io)
     count_by_type[:byte] += bytes.bytesize
   end
 
-  count_by_type
+  WcCount.new(**count_by_type)
 end
 
-def wc_total_count_by_type(results_by_type)
-  total_count_by_type = { newline: 0, word: 0, byte: 0, path: 'total' }
-  counts_by_type = wc_extract_count_by_type(results_by_type)
+def wc_total(results)
+  total_count_by_type = { newline: 0, word: 0, byte: 0 }
+  counts_by_type = results.filter_map { |result| result.count&.to_h }
 
   total_count_by_type.merge!(*counts_by_type) do |_key, total, count|
     total + count
   end
-end
 
-def wc_extract_count_by_type(results_by_type)
-  results_by_type.filter_map do |result_by_type|
-    count_by_type = result_by_type.slice(*%i[newline word byte])
-    count_by_type.empty? ? nil : count_by_type
-  end
+  WcResult.new(path: 'total', count: WcCount.new(**total_count_by_type))
 end
 
-def wc_print(print_opts, word_count_data)
-  padding_width = wc_padding_width(print_opts, word_count_data)
-  results_by_type = word_count_data.results_by_type.dup
+def wc_print(print_opts, data_wc_info)
+  padding_width = wc_padding_width(print_opts, data_wc_info)
+  data_wc_results = data_wc_info.results.dup
 
-  word_count_data.paths.size >= 2 &&
-    results_by_type.push(word_count_data.total_count_by_type)
+  data_wc_info.paths.size >= 2 && data_wc_results.push(data_wc_info.total)
 
-  outbuf = wc_make_outbuf(print_opts, results_by_type, padding_width)
+  data_wc_results.each do |data_wc_result|
+    wc_warn(**data_wc_result.deconstruct_keys(%i[path message])) if data_wc_result.message
 
-  puts outbuf
+    next unless data_wc_result.count
+
+    puts wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
+  end
+
+  data.wc_info.errno
 end
 
-def wc_padding_width(print_opts, word_count_data)
+def wc_padding_width(print_opts, data_wc_info)
   base = 1
 
-  return base if wc_simple_output?(print_opts, word_count_data.paths)
+  return base if wc_simple_output?(print_opts, data_wc_info.paths)
 
-  base = 7 unless word_count_data.regular_files_only?
-  total_bytes_digit = word_count_data.total_count_by_type[:byte].to_s.size
+  base = 7 if wc_include_non_regular_files?(data_wc_info.paths)
+  total_bytes_digit = data_wc_info.total.count.byte.to_s.size
 
   total_bytes_digit >= base ? total_bytes_digit : base
 end
 
 def wc_simple_output?(print_opts, paths)
-  (print_opts & %i[newline word byte]).size <= 1 &&
-    paths.size <= 1
+  (print_opts & WcCount.members).size <= 1 && paths.size <= 1
 end
 
-def wc_make_outbuf(print_opts, results_by_type, padding_width)
-  results_by_type.inject(+ '') do |buf, result_by_type|
-    str = wc_format_count_string(print_opts, result_by_type, padding_width)
-
-    msg = [result_by_type[:message], str].compact.join("\n")
-
-    buf << "#{msg}\n"
+def wc_include_non_regular_files?(paths)
+  paths.any? do |path|
+    path == '-' || FileTest.exist?(path) && !FileTest.file?(path)
   end
 end
 
-def wc_format_count_string(print_opts, count_by_type, padding_width)
-  count_by_type_for_print = count_by_type.slice(*print_opts)
+def wc_warn(path:, message:)
+  warn "wc: #{path}: #{message}"
+end
 
-  return nil if count_by_type_for_print.empty?
+def wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
+  return if print_opts.empty?
 
-  adjust_count_by_type =
-    count_by_type_for_print.map do |type, count|
-      str = count.to_s
+  count_values_for_print =
+    data_wc_result.count.deconstruct_keys(print_opts & WcCount.members).values
 
-      next str if padding_width <= 1 || type == :path # !print_opts.include?(type)
-
-      str.rjust(padding_width)
+  padding_width >= 2 &&
+    count_values_for_print.map! do |count_value|
+      count_value.to_s.rjust(padding_width)
     end
 
-  adjust_count_by_type.join(' ')
+  print_opts.include?(:path) && count_values_for_print << data_wc_result.path
+
+  count_values_for_print.join(' ')
 end
