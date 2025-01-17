@@ -3,7 +3,7 @@
 require 'optparse'
 
 Wc = Data.define(:paths) do
-  attr_reader(:errno, :results, :total)
+  attr_reader(*%i[errno results total])
 
   def initialize(paths:)
     @results, @errno = wc_results_with_errno(paths)
@@ -16,8 +16,7 @@ end
 
 WcResult = Data.define(*%i[path count message]) do
   def initialize(path:, count: nil, message: nil)
-    count || message ||
-      raise(ArgumentError, 'missing keywords: count: or message:')
+    count, message = wc_count_with_message(path) unless count || message
 
     super
   end
@@ -56,12 +55,12 @@ end
 def wc_results_with_errno(paths)
   errno = 0
 
-  return [[wc_result_for_valid_path('-')].freeze, errno] if paths.empty?
+  return [[WcResult.new(path: '-')].freeze, errno] if paths.empty?
 
   errno = wc_readable_inputs?(paths) ? 0 : 1
-  results = wc_results(paths)
+  results = paths.map { |path| WcResult.new(path) }.freeze
 
-  [results.freeze, errno]
+  [results, errno]
 end
 
 def wc_readable_inputs?(paths)
@@ -76,25 +75,19 @@ def wc_readable_input?(path)
   path == '-' || IO.read(path)
 end
 
-def wc_results(paths)
-  paths.lazy.map { |path| wc_result(path) }
-end
-
-def wc_result(path)
-  wc_readable_input?(path) && wc_result_for_valid_path(path)
+def wc_count_with_message(path)
+  wc_readable_input?(path) && [wc_count_for_valid_path(path), nil]
 rescue SystemCallError => e
   count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
   message = e.message.gsub(/ @ .*$/, '')
 
-  WcResult.new(path:, count:, message:)
+  [count, message]
 end
 
-def wc_result_for_valid_path(valid_path)
+def wc_count_for_valid_path(valid_path)
   fd = valid_path == '-' ? $stdin.fileno : IO.sysopen(valid_path.to_s)
 
-  count = IO.open(fd) { |io| wc_count_for_io(io.set_encoding('ASCII-8BIT')) }
-
-  WcResult.new(path: valid_path.to_s, count:)
+  IO.open(fd) { |io| wc_count_for_io(io.set_encoding('ASCII-8BIT')) }
 end
 
 def wc_count_for_io(io)
@@ -155,7 +148,7 @@ def wc_simple_output?(print_opts, paths)
 end
 
 def wc_include_non_regular_files?(paths)
-  paths.any? do |path|
+  paths.empty? || paths.any? do |path|
     path == '-' || FileTest.exist?(path) && !FileTest.file?(path)
   end
 end
@@ -165,7 +158,7 @@ def wc_warn(path:, message:)
 end
 
 def wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
-  raise(ArgumentError, 'missing keywords: print_opts') if print_opts.empty?
+  raise(ArgumentError, 'empty array: print_opts') if print_opts.empty?
 
   count_values_for_print =
     data_wc_result.count.deconstruct_keys(print_opts & WcCount.members).values
