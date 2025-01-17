@@ -16,10 +16,8 @@ end
 
 WcResult = Data.define(*%i[path count message]) do
   def initialize(path:, count: nil, message: nil)
-    unless count || message
-      raise(ArgumentError,
-            'missing keywords: count: or message:')
-    end
+    count || message ||
+      raise(ArgumentError, 'missing keywords: count: or message:')
 
     super
   end
@@ -58,7 +56,7 @@ end
 def wc_results_with_errno(paths)
   errno = 0
 
-  return [[wc_result('-')].freeze, errno] if paths.empty?
+  return [[wc_result_for_valid_path('-')].freeze, errno] if paths.empty?
 
   errno = wc_readable_inputs?(paths) ? 0 : 1
   results = wc_results(paths)
@@ -79,25 +77,27 @@ def wc_readable_input?(path)
 end
 
 def wc_results(paths)
-  paths.lazy.map do |path|
-    wc_readable_input?(path) && wc_result(path)
-  rescue SystemCallError => e
-    count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
-    message = e.message.gsub(/ @ .*$/, '')
-
-    WcResult.new(path:, count:, message:)
-  end
+  paths.lazy.map { |path| wc_result(path) }
 end
 
-def wc_result(valid_path)
+def wc_result(path)
+  wc_readable_input?(path) && wc_result_for_valid_path(path)
+rescue SystemCallError => e
+  count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
+  message = e.message.gsub(/ @ .*$/, '')
+
+  WcResult.new(path:, count:, message:)
+end
+
+def wc_result_for_valid_path(valid_path)
   fd = valid_path == '-' ? $stdin.fileno : IO.sysopen(valid_path.to_s)
 
-  count = IO.open(fd) { |io| wc_count_from_io(io.set_encoding('ASCII-8BIT')) }
+  count = IO.open(fd) { |io| wc_count_for_io(io.set_encoding('ASCII-8BIT')) }
 
   WcResult.new(path: valid_path.to_s, count:)
 end
 
-def wc_count_from_io(io)
+def wc_count_for_io(io)
   count_by_type = { newline: 0, word: 0, byte: 0 }
 
   io.each do |str|
@@ -165,7 +165,7 @@ def wc_warn(path:, message:)
 end
 
 def wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
-  return if print_opts.empty?
+  raise(ArgumentError, 'missing keywords: print_opts') if print_opts.empty?
 
   count_values_for_print =
     data_wc_result.count.deconstruct_keys(print_opts & WcCount.members).values
