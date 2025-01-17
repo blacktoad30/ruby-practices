@@ -41,14 +41,12 @@ end
 
 def wc_parse_args(args)
   copy_args = args.dup
+  optsym_by_opt = { 'l' => :newline, 'w' => :word, 'c' => :byte }
 
-  optarg_by_opt =
-    OptionParser.new
-                .getopts(copy_args, 'lwc')
-                .transform_keys!('l' => :newline, 'w' => :word, 'c' => :byte)
+  optarg_by_opt = OptionParser.new.getopts(copy_args, 'lwc')
 
-  optarg_by_opt.value?(true) ||
-    optarg_by_opt.transform_values! { |_| true }
+  optarg_by_opt.transform_keys!(optsym_by_opt)
+  optarg_by_opt.value?(true) || optarg_by_opt.transform_values! { |_| true }
 
   optarg_by_opt[:path] = !copy_args.empty?
 
@@ -60,13 +58,12 @@ end
 def wc_results_with_errno(paths)
   errno = 0
 
-  return [[wc_result('-')], errno] if paths.empty?
+  return [[wc_result('-')].freeze, errno] if paths.empty?
 
   errno = wc_readable_inputs?(paths) ? 0 : 1
-
   results = wc_results(paths)
 
-  [results, errno]
+  [results.freeze, errno]
 end
 
 def wc_readable_inputs?(paths)
@@ -95,8 +92,7 @@ end
 def wc_result(valid_path)
   fd = valid_path == '-' ? $stdin.fileno : IO.sysopen(valid_path.to_s)
 
-  count =
-    IO.open(fd) { |io| wc_count_from_io(io.set_encoding('ASCII-8BIT')) }
+  count = IO.open(fd) { |io| wc_count_from_io(io.set_encoding('ASCII-8BIT')) }
 
   WcResult.new(path: valid_path.to_s, count:)
 end
@@ -104,18 +100,18 @@ end
 def wc_count_from_io(io)
   count_by_type = { newline: 0, word: 0, byte: 0 }
 
-  io.each do |bytes|
-    count_by_type[:newline] += bytes.count("\n")
-    count_by_type[:word] += bytes.scan(/[[:graph:]]+/).size
-    count_by_type[:byte] += bytes.bytesize
+  io.each do |str|
+    count_by_type[:newline] += str.count("\n")
+    count_by_type[:word] += str.scan(/[[:graph:]]+/).size
+    count_by_type[:byte] += str.bytesize
   end
 
   WcCount.new(**count_by_type)
 end
 
-def wc_total(results)
+def wc_total(data_wc_results)
   total_count_by_type = { newline: 0, word: 0, byte: 0 }
-  counts_by_type = results.filter_map { |result| result.count&.to_h }
+  counts_by_type = data_wc_results.filter_map { |result| result.count&.to_h }
 
   total_count_by_type.merge!(*counts_by_type) do |_key, total, count|
     total + count
@@ -126,13 +122,14 @@ end
 
 def wc_print(print_opts, data_wc)
   padding_width = wc_padding_width(print_opts, data_wc)
-  data_wc_results = data_wc.results.dup
 
-  data_wc.paths.size >= 2 &&
-    data_wc_results = data_wc_results.chain([data_wc.total])
+  data_wc_results =
+    data_wc.paths.size >= 2 && data_wc.results.chain([data_wc.total]) ||
+    data_wc.results
 
   data_wc_results.each do |data_wc_result|
-    wc_warn(**data_wc_result.deconstruct_keys(%i[path message])) if data_wc_result.message
+    data_wc_result.message &&
+      wc_warn(**data_wc_result.deconstruct_keys(%i[path message]))
 
     next unless data_wc_result.count
 
