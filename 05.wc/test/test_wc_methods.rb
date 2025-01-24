@@ -15,12 +15,12 @@ LOGGER = Logger.new($stdout)
 
 LOGGER.level = LOGGER_LEVEL[ARGV[0]] || ARGV[0]&.to_i || Logger::WARN
 
-TEST_DATA_SETS_DIR = "#{File.dirname(__FILE__)}/data/".freeze
+# TEST_DATA_SETS_DIR = "#{File.dirname(__FILE__)}/data/".freeze
 
 # test 'wc_methods.rb'
 class WcMethodsTest < Minitest::Test
   def data_sets_file_path(filename)
-    "#{TEST_DATA_SETS_DIR}#{filename}.yaml"
+    "#{File.dirname(__FILE__)}/data/#{filename}.yaml"
   end
 
   def test_wc_parse_args
