@@ -57,26 +57,18 @@ def wc_results_with_errno(paths)
 
   return [[WcResult.new(path: '-')].freeze, errno] if paths.empty?
 
-  errno = wc_readable_inputs?(paths) ? 0 : 1
+  errno = wc_readable_file_paths?(paths) ? 0 : 1
   results = paths.map { |path| WcResult.new(path) }.freeze
 
   [results, errno]
 end
 
-def wc_readable_inputs?(paths)
-  paths.all? do |path|
-    wc_readable_input?(path)
-  rescue SystemCallError
-    false
-  end
-end
-
-def wc_readable_input?(path)
-  path == '-' || IO.read(path)
+def wc_readable_file_paths?(paths)
+  paths.all? { |path| path == '-' || FileTest.readable?(path) }
 end
 
 def wc_count_with_message(path)
-  wc_readable_input?(path) && [wc_count_for_valid_path(path), nil]
+  (path == '-' || IO.read(path)) && [wc_count_for_valid_path(path), nil]
 rescue SystemCallError => e
   count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
   message = e.message.gsub(/ @ .*$/, '')
@@ -126,7 +118,7 @@ def wc_print(print_opts, data_wc)
 
     next unless data_wc_result.count
 
-    puts wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
+    puts wc_format_result(data_wc_result, print_opts, padding_width)
   end
 
   data_wc.errno
@@ -157,7 +149,7 @@ def wc_warn(path:, message:)
   warn "wc: #{path}: #{message}"
 end
 
-def wc_format_data_wc_result(data_wc_result, print_opts, padding_width)
+def wc_format_result(data_wc_result, print_opts, padding_width)
   raise(ArgumentError, 'empty array: print_opts') if print_opts.empty?
 
   count_values_for_print =
