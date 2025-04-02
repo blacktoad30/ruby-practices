@@ -28,7 +28,7 @@ WcCount = Data.define(*%i[newline word byte]) do
     super
   end
 end
-
+
 def main(args)
   print_opts, paths = parse_args(args)
 
@@ -104,7 +104,7 @@ def wc_results_total(wc_results)
 
   WcResult.new(path: 'total', count: WcCount.new(**total_count_by_type))
 end
-
+
 def print_wc_data(print_opts, wc_data)
   padding_width = padding_width(print_opts, wc_data)
   wc_results = wc_data.results.dup
