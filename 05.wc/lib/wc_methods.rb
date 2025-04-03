@@ -35,6 +35,8 @@ def main(args)
   wc_data = WcData.new(paths)
 
   print_wc_data(print_opts, wc_data)
+
+  wc_data.errno
 end
 
 def parse_args(args)
@@ -118,8 +120,6 @@ def print_wc_data(print_opts, wc_data)
 
     puts format_wc_result(wc_result, print_opts, padding_width)
   end
-
-  wc_data.errno
 end
 
 def padding_width(print_opts, wc_data)
