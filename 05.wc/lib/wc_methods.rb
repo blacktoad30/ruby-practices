@@ -2,6 +2,11 @@
 
 require 'optparse'
 
+OPTION_STRING = 'lwc'
+WORD_COUNT_TYPES = %i[newline word byte].freeze
+
+OPTION_NAME_TO_WORD_COUNT_TYPE = OPTION_STRING.chars.zip(WORD_COUNT_TYPES).to_h.freeze
+
 WcData = Data.define(:paths) do
   attr_reader(*%i[errno results total])
 
@@ -23,16 +28,16 @@ WcResult = Data.define(*%i[path count message]) do
   end
 end
 
-WcCount = Data.define(*%i[newline word byte]) do
+WcCount = Data.define(*WORD_COUNT_TYPES) do
   def initialize(newline: 0, word: 0, byte: 0)
     super
   end
 end
 
 def main(args)
-  print_opts, paths = parse_args(args)
+  print_opts = parse_args(args)
 
-  wc_data = WcData.new(paths)
+  wc_data = WcData.new(args)
 
   print_wc_data(print_opts, wc_data)
 
@@ -40,19 +45,14 @@ def main(args)
 end
 
 def parse_args(args)
-  copy_args = args.dup
-  optsym_by_opt = { 'l' => :newline, 'w' => :word, 'c' => :byte }
+  parsed_options = OptionParser.new.getopts(args, OPTION_STRING).transform_keys(OPTION_NAME_TO_WORD_COUNT_TYPE)
 
-  optarg_by_opt = OptionParser.new.getopts(copy_args, 'lwc')
+  # `wc [file ...]` == `wc -lwc [file ...]`
+  parsed_options.transform_values! { |_| true } unless parsed_options.value?(true)
 
-  optarg_by_opt.transform_keys!(optsym_by_opt)
-  optarg_by_opt.value?(true) || optarg_by_opt.transform_values! { |_| true }
+  parsed_options[:path] = !args.empty?
 
-  optarg_by_opt[:path] = !copy_args.empty?
-
-  print_opts = optarg_by_opt.select { |_, val| val }.keys
-
-  [print_opts, copy_args]
+  parsed_options.select { |_, val| val }.keys
 end
 
 def readable_files?(paths)
