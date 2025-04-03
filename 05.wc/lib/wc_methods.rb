@@ -68,7 +68,7 @@ def wc_results(paths)
 end
 
 def wc_count_with_message(path)
-  path == '-' || IO.read(path)
+  path == '-' || File.read(path)
 rescue SystemCallError => e
   count = e.is_a?(Errno::EISDIR) ? WcCount.new : nil
   message = e.message.gsub(/ @ .*$/, '')
@@ -79,9 +79,9 @@ else
 end
 
 def wc_count_for_valid_path(valid_path)
-  fd = valid_path == '-' ? $stdin.fileno : IO.sysopen(valid_path.to_s)
+  path = valid_path == '-' ? $stdin.fileno : valid_path
 
-  IO.open(fd) { |io| wc_count_for_io(io.set_encoding('ASCII-8BIT')) }
+  File.open(path) { |f| wc_count_for_io(f.set_encoding('ASCII-8BIT')) }
 end
 
 def wc_count_for_io(io)
