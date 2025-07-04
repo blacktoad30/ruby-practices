@@ -5,14 +5,14 @@ require_relative './wc_pathname'
 
 OPTION_STRING = 'lwc'
 
-OPTION_NAME_TO_WORD_COUNT_TYPE = OPTION_STRING.chars.zip(WORD_COUNT_TYPES).to_h.freeze
+OPTION_NAME_TO_WORD_COUNT_TYPE = OPTION_STRING.chars.zip(WordCount::TYPES).to_h.freeze
 
 def main(args)
   displayed_items = parse_args(args)
 
   wc_paths = args.empty? ? [WcPathname.new('-')] : args.map { WcPathname.new(_1) }
 
-  word_count_types = extract_word_count_types(displayed_items)
+  word_count_types = WordCount.extract_types(displayed_items)
 
   output_format = displayed_output_format(displayed_items, wc_paths)
 
@@ -42,12 +42,8 @@ def parse_args(args)
   parsed_options.select { |_, val| val }.keys
 end
 
-def extract_word_count_types(displayed_items)
-  WORD_COUNT_TYPES & displayed_items
-end
-
 def displayed_output_format(displayed_items, wc_paths)
-  one_type_one_operand = extract_word_count_types(displayed_items).size == 1 && wc_paths.size == 1
+  one_type_one_operand = WordCount.extract_types(displayed_items).size == 1 && wc_paths.size == 1
 
   digit = one_type_one_operand ? 1 : adjust_digit(wc_paths)
 
