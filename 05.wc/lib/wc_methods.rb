@@ -63,24 +63,11 @@ end
 
 def word_count_results(word_count_types, wc_paths)
   wc_paths.map do |wc_path|
-    count, message =
-      with_system_call_error_handler(:word_count_error_handler, word_count_types) { wc_path.word_count(_1) }
+    count = wc_path.word_count(word_count_types)
+    message = wc_path.word_count_message
 
     { path: wc_path.to_s, count:, message: }.freeze
   end
-end
-
-def with_system_call_error_handler(error_handler, *args)
-  yield(*args)
-rescue SystemCallError => e
-  method(error_handler).call(e, *args)
-end
-
-def word_count_error_handler(error, word_count_types)
-  count = error.is_a?(Errno::EISDIR) ? word_count_types.to_h { [_1, 0] } : nil
-  message = error.message.split(' @ ').first
-
-  [count, message]
 end
 
 def print_word_count_result(output_format, result)

@@ -54,8 +54,22 @@ class WcPathname
   end
 
   def word_count(word_count_types = WordCount::TYPES)
+    return nil unless exist? && readable?
+
+    return word_count_types.to_h { [_1, 0] } if directory?
+
     return { byte: regular_file_size } if word_count_types == %i[byte] && !regular_file_size?.nil?
 
     open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types, regular_file_size?) }
+  end
+
+  def word_count_message
+    return 'No such file or directory' unless exist?
+
+    return 'Permission denied' unless readable?
+
+    return 'Is a directory' if directory?
+
+    nil
   end
 end
