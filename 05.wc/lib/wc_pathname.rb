@@ -1,25 +1,44 @@
 # frozen_string_literal: true
 
-require 'pathname'
 require_relative './word_count'
 
-class WcPathname < Pathname
-  def initialize(path)
-    super(path)
+class WcPathname
+  USE_FILETEST_MODULE_FUNCTIONS = %i[directory? file? readable? size].freeze
 
-    @pathname_or_stat = stdin? ? $stdin.stat : self
+  private_constant :USE_FILETEST_MODULE_FUNCTIONS
+
+  def initialize(path)
+    @path = path
   end
 
   def stdin?
     @path == '-'
   end
 
-  def regular_file?
-    @pathname_or_stat.file?
+  def inspect
+    "#<#{self.class}:#{@path}>"
+  end
+
+  def to_s
+    @path
+  end
+
+  def open(mode = 'r', perm = 0o0666, &block)
+    return block&.call($stdin) || $stdin if stdin?
+
+    File.open(@path, mode, perm, &block)
+  end
+
+  def exist?
+    stdin? || FileTest.exist?(@path)
+  end
+
+  USE_FILETEST_MODULE_FUNCTIONS.each do |method|
+    define_method(method) { stdin? ? $stdin.stat.public_send(method) : FileTest.public_send(method, @path) }
   end
 
   def regular_file_size?
-    @pathname_or_stat.size if regular_file?
+    size if file?
   end
 
   def regular_file_size
@@ -27,19 +46,15 @@ class WcPathname < Pathname
   end
 
   def exist_non_regular_file?
-    return !regular_file? if stdin?
-
     exist? && !file?
   end
 
   def readable_non_directory?
-    @pathname_or_stat.readable? && !@pathname_or_stat.directory?
+    readable? && !directory?
   end
 
   def word_count(word_count_types = WordCount::TYPES)
     return { byte: regular_file_size } if word_count_types == %i[byte] && !regular_file_size?.nil?
-
-    return $stdin.set_encoding('ASCII-8BIT').word_count(word_count_types, regular_file_size?) if stdin?
 
     open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types, regular_file_size?) }
   end
