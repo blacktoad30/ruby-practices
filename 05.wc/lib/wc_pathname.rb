@@ -58,11 +58,11 @@ class WcPathname
   private
 
   def word_count(word_count_types)
-    return open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types, nil) } unless file? && word_count_types.include?(:byte)
+    return open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types) } unless file? && word_count_types.include?(:byte)
 
     return { byte: size } if word_count_types == %i[byte]
 
-    counts = open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types - %i[byte], size) }
+    counts = open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types - %i[byte]) }
 
     { **counts, byte: size }
   end

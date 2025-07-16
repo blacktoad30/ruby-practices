@@ -15,27 +15,27 @@ module WordCount::IO
 
   private_constant :BUFFER_SIZE
 
-  def word_count(word_count_types = WordCount::TYPES, file_size = nil)
+  def word_count(word_count_types = WordCount::TYPES)
     counts = []
 
     loop do
       str = readpartial(BUFFER_SIZE)
 
-      count = str.word_count(word_count_types, file_size)
+      count = str.word_count(word_count_types)
 
       counts << count
     rescue EOFError
       break
     end
 
-    word_count_types.to_h { [_1, _1 == :byte ? file_size.to_i : 0] }
+    word_count_types.to_h { [_1, 0] }
                     .merge!(*counts) { |_, total, count| total + count }
   end
 end
 
 module WordCount::String
-  def word_count(word_count_types = WordCount::TYPES, file_size = nil)
-    word_count_types.to_h { [_1, _1 == :byte && !file_size.nil? ? 0 : word_count_per_type(_1)] }
+  def word_count(word_count_types = WordCount::TYPES)
+    word_count_types.to_h { [_1, word_count_per_type(_1)] }
   end
 
   private
