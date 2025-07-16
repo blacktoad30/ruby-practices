@@ -17,8 +17,9 @@ def main(args)
   output_format = displayed_output_format(displayed_items, wc_paths)
 
   counts =
-    word_count_results(word_count_types, wc_paths).each { print_word_count_result(output_format, _1) }
-                                                  .filter_map { _1[:count] }
+    wc_paths.map { _1.word_count_result(word_count_types) }
+            .each { print_word_count_result(output_format, _1) }
+            .filter_map { _1[:count] }
 
   if wc_paths.size >= 2
     count_total =
@@ -59,15 +60,6 @@ def adjust_digit(wc_paths)
   total_bytes_digit = wc_paths.sum(&:regular_file_size).to_s.size
 
   [default_digit, total_bytes_digit].max
-end
-
-def word_count_results(word_count_types, wc_paths)
-  wc_paths.map do |wc_path|
-    count = wc_path.word_count(word_count_types)
-    message = wc_path.word_count_message
-
-    { path: wc_path.to_s, count:, message: }.freeze
-  end
 end
 
 def print_word_count_result(output_format, result)

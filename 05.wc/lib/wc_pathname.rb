@@ -19,10 +19,6 @@ class WcPathname
     "#<#{self.class}:#{@path}>"
   end
 
-  def to_s
-    @path
-  end
-
   def open(mode = 'r', perm = 0o0666, &block)
     return block&.call($stdin) || $stdin if stdin?
 
@@ -37,12 +33,8 @@ class WcPathname
     define_method(method) { stdin? ? $stdin.stat.public_send(method) : FileTest.public_send(method, @path) }
   end
 
-  def regular_file_size?
-    size if file?
-  end
-
   def regular_file_size
-    regular_file_size?.to_i
+    file? ? size : 0
   end
 
   def exist_non_regular_file?
@@ -53,23 +45,25 @@ class WcPathname
     readable? && !directory?
   end
 
-  def word_count(word_count_types = WordCount::TYPES)
-    return nil unless exist? && readable?
+  def word_count_result(word_count_types = WordCount::TYPES)
+    path = @path
 
-    return word_count_types.to_h { [_1, 0] } if directory?
+    return { path:, count: nil, message: exist? ? 'Permission denied' : 'No such file or directory' } unless readable?
 
-    return { byte: regular_file_size } if word_count_types == %i[byte] && !regular_file_size?.nil?
+    return { path:, count: word_count_types.to_h { [_1, 0] }, message: 'Is a directory' } if directory?
 
-    open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types, regular_file_size?) }
+    { path:, count: word_count(word_count_types), message: nil }
   end
 
-  def word_count_message
-    return 'No such file or directory' unless exist?
+  private
 
-    return 'Permission denied' unless readable?
+  def word_count(word_count_types)
+    return open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types, nil) } unless file? && word_count_types.include?(:byte)
 
-    return 'Is a directory' if directory?
+    return { byte: size } if word_count_types == %i[byte]
 
-    nil
+    counts = open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types - %i[byte], size) }
+
+    { **counts, byte: size }
   end
 end
