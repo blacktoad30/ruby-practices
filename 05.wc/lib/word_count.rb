@@ -81,21 +81,20 @@ module WordCount::IO
 
   private_constant :BUFFER_SIZE
 
-  def word_count(word_count_types = WordCount::TYPES)
-    counts = []
+  def word_count(word_count_types = WordCount::TYPES, bufsize: BUFFER_SIZE)
+    each_buffer(bufsize).inject(:<<).to_s.word_count(word_count_types)
+  end
+
+  def each_buffer(limit = BUFFER_SIZE)
+    return to_enum(__callee__, limit) unless block_given?
 
     loop do
-      str = readpartial(BUFFER_SIZE)
-
-      count = str.word_count(word_count_types)
-
-      counts << count
+      yield readpartial(limit)
     rescue EOFError
       break
     end
 
-    word_count_types.to_h { [_1, 0] }
-                    .merge!(*counts) { |_, total, count| total + count }
+    self
   end
 end
 
@@ -111,7 +110,11 @@ module WordCount::String
     when :newline
       count("\n")
     when :word
-      split.size
+      num = 0
+
+      split { num += 1 if _1.match?(/[[:graph:]]/) }
+
+      num
     when :byte
       bytesize
     else
