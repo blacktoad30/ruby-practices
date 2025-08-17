@@ -10,7 +10,7 @@ OPTION_NAME_TO_WORD_COUNT_TYPE = OPTION_STRING.chars.zip(WordCount::TYPES).to_h.
 def main(args)
   displayed_items = parse_args(args)
 
-  wc_paths = args.empty? ? [WordCount::Pathname.new('-')] : args.map { WordCount::Pathname.new(_1) }
+  wc_paths = args.empty? ? [WordCount::Pathname.new] : args.map { WordCount::Pathname.new(_1) }
 
   word_count_types = WordCount.extract_types(displayed_items)
 

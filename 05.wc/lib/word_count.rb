@@ -15,30 +15,36 @@ class WordCount::Pathname
 
   private_constant :USE_FILETEST_MODULE_FUNCTIONS
 
-  def initialize(path)
-    @path = path
+  def initialize(path = nil)
+    @path = path.to_s
+  end
+
+  def to_path
+    return '-' if @path.empty?
+
+    @path
   end
 
   def stdin?
-    @path == '-'
+    to_path == '-'
   end
 
   def inspect
-    "#<#{self.class}:#{@path}>"
+    "#<#{self.class}:#{to_path}>"
   end
 
   def open(mode = 'r', perm = 0o0666, &block)
     return block&.call($stdin) || $stdin if stdin?
 
-    File.open(@path, mode, perm, &block)
+    File.open(to_path, mode, perm, &block)
   end
 
   def exist?
-    stdin? || FileTest.exist?(@path)
+    stdin? || FileTest.exist?(to_path)
   end
 
   USE_FILETEST_MODULE_FUNCTIONS.each do |method|
-    define_method(method) { stdin? ? $stdin.stat.public_send(method) : FileTest.public_send(method, @path) }
+    define_method(method) { stdin? ? $stdin.stat.public_send(method) : FileTest.public_send(method, to_path) }
   end
 
   def regular_file_size
@@ -54,7 +60,7 @@ class WordCount::Pathname
   end
 
   def word_count_result(word_count_types = WordCount::TYPES)
-    path = @path
+    path = @path.empty? ? 'standard input' : @path
 
     return { path:, count: nil, message: exist? ? 'Permission denied' : 'No such file or directory' } unless readable?
 
