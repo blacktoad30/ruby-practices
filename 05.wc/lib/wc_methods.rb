@@ -16,20 +16,19 @@ def main(args)
 
   output_format = displayed_output_format(displayed_items, wc_paths)
 
-  counts =
+  results =
     wc_paths.map { _1.word_count_result(word_count_types) }
             .each { print_word_count_result(output_format, _1) }
-            .filter_map { _1[:count] }
 
   if wc_paths.size >= 2
     count_total =
       word_count_types.to_h { [_1, 0] }
-                      .merge!(*counts) { |_, total, count| total + count }
+                      .merge!(*results.filter_map { _1[:count] }) { |_, total, count| total + count }
 
     print_word_count_result(output_format, { path: 'total', count: count_total, message: nil })
   end
 
-  wc_paths.all?(&:readable_non_directory?) ? 0 : 1
+  results.any? { _1[:message] } ? 1 : 0
 end
 
 def parse_args(args)

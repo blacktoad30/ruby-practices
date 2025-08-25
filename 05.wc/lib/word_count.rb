@@ -55,10 +55,6 @@ class WordCount::Pathname
     exist? && !file?
   end
 
-  def readable_non_directory?
-    readable? && !directory?
-  end
-
   def word_count_result(word_count_types = WordCount::TYPES)
     path = @path.empty? ? 'standard input' : @path
 
@@ -67,6 +63,8 @@ class WordCount::Pathname
     return { path:, count: word_count_types.to_h { [_1, 0] }, message: 'Is a directory' } if directory?
 
     { path:, count: word_count(word_count_types), message: nil }
+  rescue Errno::EPERM => e
+    { path:, count: nil, message: e.message.partition(' @ ').first }
   end
 
   private
