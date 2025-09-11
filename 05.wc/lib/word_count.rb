@@ -104,26 +104,28 @@ end
 
 module WordCount::String
   def word_count(word_count_types = WordCount::TYPES)
-    word_count_types.to_h { [_1, word_count_per_type(_1)] }
+    word_count_types.to_h do |type|
+      case type
+      when *WordCount::TYPES
+        [type, __send__(type)]
+      else
+        raise ArgumentError, "word_count_type: allow only #{WordCount::TYPES.map(&:inspect).join(', ')}"
+      end
+    end
   end
 
   private
 
-  def word_count_per_type(word_count_type)
-    case word_count_type
-    when :newline
-      count("\n")
-    when :word
-      num = 0
+  def newline
+    count("\n")
+  end
 
-      split { num += 1 if _1.match?(/[[:graph:]]/) }
+  def word
+    num = 0
 
-      num
-    when :bytesize
-      bytesize
-    else
-      raise(ArgumentError, "word_count_type: allow only #{WordCount::TYPES.map(&:inspect).join(', ')}")
-    end
+    split { num += 1 if _1.match?(/[[:graph:]]/) }
+
+    num
   end
 end
 
