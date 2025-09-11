@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 module WordCount
-  TYPES = %i[newline word byte].freeze
+  TYPES = %i[newline word bytesize].freeze
 
   def extract_types(types)
     TYPES & types
@@ -70,13 +70,13 @@ class WordCount::Pathname
   private
 
   def word_count(word_count_types)
-    return open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types) } unless file? && word_count_types.include?(:byte)
+    return open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types) } unless file? && word_count_types.include?(:bytesize)
 
-    return { byte: size } if word_count_types == %i[byte]
+    return { bytesize: size } if word_count_types == %i[bytesize]
 
-    counts = open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types - %i[byte]) }
+    counts = open { _1.set_encoding('ASCII-8BIT').word_count(word_count_types - %i[bytesize]) }
 
-    { **counts, byte: size }
+    { **counts, bytesize: size }
   end
 end
 
@@ -119,7 +119,7 @@ module WordCount::String
       split { num += 1 if _1.match?(/[[:graph:]]/) }
 
       num
-    when :byte
+    when :bytesize
       bytesize
     else
       raise(ArgumentError, "word_count_type: allow only #{WordCount::TYPES.map(&:inspect).join(', ')}")

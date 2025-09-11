@@ -49,7 +49,7 @@ def displayed_output_format(displayed_items, wc_paths)
 
   { newline: "%<newline>#{digit}d",
     word: "%<word>#{digit}d",
-    byte: "%<byte>#{digit}d",
+    bytesize: "%<bytesize>#{digit}d",
     path: '%<path>s' }.values_at(*displayed_items).join(' ')
 end
 
