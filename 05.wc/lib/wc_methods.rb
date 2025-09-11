@@ -47,10 +47,7 @@ def displayed_output_format(displayed_items, wc_paths)
 
   digit = one_type_one_operand ? 1 : adjust_digit(wc_paths)
 
-  { newline: "%<newline>#{digit}d",
-    word: "%<word>#{digit}d",
-    bytesize: "%<bytesize>#{digit}d",
-    path: '%<path>s' }.values_at(*displayed_items).join(' ')
+  displayed_items.map { output_format_string(_1, digit) }.join(' ')
 end
 
 def adjust_digit(wc_paths)
@@ -59,6 +56,17 @@ def adjust_digit(wc_paths)
   total_bytes_digit = wc_paths.sum(&:regular_file_size).to_s.size
 
   [default_digit, total_bytes_digit].max
+end
+
+def output_format_string(displayed_item, digit)
+  case displayed_item
+  when *WordCount::TYPES
+    "%<#{displayed_item}>#{digit}d"
+  when :path
+    '%<path>s'
+  else
+    raise ArgumentError, "displayed_item: allow only #{[*WordCount::TYPES, :path].map(&:inspect).join(', ')}"
+  end
 end
 
 def print_word_count_result(output_format, result)
