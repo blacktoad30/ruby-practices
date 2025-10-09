@@ -117,41 +117,32 @@ def directory?(path)
 end
 
 def word_count(path, word_count_types = WORD_COUNT_TYPES)
-  return { bytesize: size(path) } if file?(path) && word_count_types == %i[bytesize]
+  arg_path = stdin?(path) ? 0 : path
 
-  file_size_is_available = file?(path) && word_count_types.include?(:bytesize)
+  lines = File.open(arg_path, encoding: 'ASCII-8BIT', &:readlines)
+  word_count = {}
 
-  types = file_size_is_available ? word_count_types - %i[bytesize] : word_count_types
+  word_count[:newline] = count_newline(lines) if word_count_types.include?(:newline)
+  word_count[:word] = count_word(lines) if word_count_types.include?(:word)
+  word_count[:bytesize] = (file?(path) ? size(path) : count_bytesize(lines)) if word_count_types.include?(:bytesize)
 
-  counts_each_line = File.open(stdin?(path) ? 0 : path) { |io| io.set_encoding('ASCII-8BIT').map { word_count_for_string(_1, types) } }
-
-  count = word_count_sum(counts_each_line, types)
-
-  file_size_is_available ? { **count, bytesize: size(path) } : count
+  word_count
 end
 
-def word_count_for_string(str, word_count_types = WORD_COUNT_TYPES)
-  word_count_types.to_h do |word_count_type|
-    case word_count_type
-    when *WORD_COUNT_TYPES
-      [word_count_type, word_count_for_string_per_type(str, word_count_type)]
-    else
-      raise ArgumentError, "word_count_type: allow only #{WORD_COUNT_TYPES.map(&:inspect).join(', ')}"
-    end
-  end
+def count_newline(lines)
+  lines.sum { |line| line.count("\n") }
 end
 
-def word_count_for_string_per_type(str, word_count_type)
-  case word_count_type
-  when :newline
-    str.count("\n")
-  when :word
+def count_word(lines)
+  lines.sum do |line|
     num = 0
-    str.split { num += 1 if _1.match?(/[[:graph:]]/) }
+    line.split { num += 1 if _1.match?(/[[:graph:]]/) }
     num
-  when :bytesize
-    str.bytesize
   end
+end
+
+def count_bytesize(lines)
+  lines.sum(&:bytesize)
 end
 
 def word_count_sum(counts, word_count_types = WORD_COUNT_TYPES)
