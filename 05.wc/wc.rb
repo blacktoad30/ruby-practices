@@ -4,65 +4,61 @@
 require 'optparse'
 
 OPTION_STRING = 'lwc'
-WORD_COUNT_TYPES = %i[newline word bytesize].freeze
-
-OPTION_NAME_TO_WORD_COUNT_TYPE = OPTION_STRING.chars.zip(WORD_COUNT_TYPES).to_h.freeze
+DEFAULT_OPTION_CHARS = OPTION_STRING.chars.freeze
 
 def main(args)
-  enabled_options = parse_args(args)
+  options = OptionParser.getopts(args, OPTION_STRING)
 
-  paths = args.empty? ? [''] : args
+  option_chars = extract_option_chars(options)
 
-  word_count_types = extract_word_count_types(enabled_options)
+  format_string = generate_format_string(args, option_chars)
+  results = word_count_results(args, option_chars)
 
-  output_format = displayed_output_format(enabled_options, paths)
+  results.each { print_word_count_result(format_string, _1) }
 
-  results =
-    paths.map { word_count_result(_1, word_count_types) }
-         .each { print_word_count_result(output_format, _1) }
+  if args.size >= 2
+    count_total =
+      option_chars.to_h { [_1, 0] }
+                  .merge!(*results.filter_map { _1[:count] }) { |_, total, count| total + count }
 
-  if paths.size >= 2
-    count_total = word_count_sum(results.filter_map { _1[:count] }, word_count_types)
-
-    print_word_count_result(output_format, { path: 'total', count: count_total, message: nil })
+    print_word_count_result(format_string, { path: 'total', count: count_total })
   end
 
-  results.any? { _1[:message] } ? 1 : 0
+  0
 end
 
-def parse_args(args)
-  parsed_options = OptionParser.new.getopts(args, OPTION_STRING).transform_keys(OPTION_NAME_TO_WORD_COUNT_TYPE)
+def extract_option_chars(options)
+  option_chars = options.filter_map { |opt, bool| opt if bool }
 
   # `wc [file ...]` == `wc -lwc [file ...]`
-  parsed_options.transform_values! { |_| true } unless parsed_options.value?(true)
-
-  parsed_options[:path] = !args.empty?
-
-  parsed_options.select { |_, val| val }.keys
+  option_chars.empty? ? DEFAULT_OPTION_CHARS : option_chars
 end
 
-def extract_word_count_types(types)
-  WORD_COUNT_TYPES & types
+def generate_format_string(parsed_args, option_chars = DEFAULT_OPTION_CHARS)
+  enabled_option_count = option_chars.size
+
+  need_padding = enabled_option_count >= 2 || parsed_args.size >= 2
+
+  digit = need_padding ? calc_digit(parsed_args) : 1
+
+  format_string = Array.new(enabled_option_count, "%#{digit}d")
+
+  format_string << '%s' unless parsed_args.empty?
+
+  format_string.join(' ')
 end
 
-def displayed_output_format(enabled_options, paths)
-  one_type_one_operand = extract_word_count_types(enabled_options).size == 1 && paths.size <= 1
+def calc_digit(parsed_args)
+  paths = parsed_args.empty? ? ['-'] : parsed_args
 
-  digit = one_type_one_operand ? 1 : adjust_digit(paths)
-
-  enabled_options.map { output_format_string(_1, digit) }.join(' ')
-end
-
-def adjust_digit(paths)
   default_digit = paths.any? { exist_non_regular_file?(_1) } ? 7 : 1
-
   total_bytes_digit = paths.sum { regular_file_size(_1) }.to_s.size
 
   [default_digit, total_bytes_digit].max
 end
 
 def stdin?(path)
-  path == '-' || path.empty?
+  path == '-'
 end
 
 def exist_non_regular_file?(path)
@@ -85,46 +81,28 @@ def size(path)
   stdin?(path) ? $stdin.stat.size : FileTest.size(path)
 end
 
-def output_format_string(enabled_option, digit)
-  case enabled_option
-  when *WORD_COUNT_TYPES
-    "%<#{enabled_option}>#{digit}d"
-  when :path
-    "%<#{enabled_option}>s"
-  else
-    raise ArgumentError, "enabled_option: allow only #{[*WORD_COUNT_TYPES, :path].map(&:inspect).join(', ')}"
+def word_count_results(parsed_args, option_chars = DEFAULT_OPTION_CHARS)
+  paths = parsed_args.empty? ? ['-'] : parsed_args
+
+  paths.map do |path|
+    results = {}
+
+    results[:path] = path
+    results[:count] = word_count(path, option_chars)
+
+    results
   end
 end
 
-def word_count_result(path, word_count_types = WORD_COUNT_TYPES)
-  display_path = path.empty? ? 'standard input' : path
-
-  return { path: display_path, count: nil, message: exist?(path) ? 'Permission denied' : 'No such file or directory' } unless readable?(path)
-
-  return { path: display_path, count: word_count_types.to_h { [_1, 0] }, message: 'Is a directory' } if directory?(path)
-
-  { path: display_path, count: word_count(path, word_count_types), message: nil }
-rescue Errno::EPERM => e
-  { path: display_path, count: nil, message: e.message.partition(' @ ').first }
-end
-
-def readable?(path)
-  stdin?(path) ? $stdin.stat.readable? : FileTest.readable?(path)
-end
-
-def directory?(path)
-  stdin?(path) ? $stdin.stat.directory? : FileTest.directory?(path)
-end
-
-def word_count(path, word_count_types = WORD_COUNT_TYPES)
+def word_count(path, option_chars = DEFAULT_OPTION_CHARS)
   arg_path = stdin?(path) ? 0 : path
 
   lines = File.open(arg_path, encoding: 'ASCII-8BIT', &:readlines)
   word_count = {}
 
-  word_count[:newline] = count_newline(lines) if word_count_types.include?(:newline)
-  word_count[:word] = count_word(lines) if word_count_types.include?(:word)
-  word_count[:bytesize] = (file?(path) ? size(path) : count_bytesize(lines)) if word_count_types.include?(:bytesize)
+  word_count['l'] = count_newline(lines) if option_chars.include?('l')
+  word_count['w'] = count_word(lines) if option_chars.include?('w')
+  word_count['c'] = (file?(path) ? size(path) : count_bytesize(lines)) if option_chars.include?('c')
 
   word_count
 end
@@ -145,15 +123,8 @@ def count_bytesize(lines)
   lines.sum(&:bytesize)
 end
 
-def word_count_sum(counts, word_count_types = WORD_COUNT_TYPES)
-  word_count_types.to_h { [_1, 0] }
-                  .merge!(*counts) { |_, total, count| total + count }
-end
-
-def print_word_count_result(output_format, result)
-  warn "wc: #{result[:path]}: #{result[:message]}" if result[:message]
-
-  puts format(output_format, **result[:count], path: result[:path]) unless result[:count].nil?
+def print_word_count_result(format_string, result)
+  puts format(format_string, *result[:count].values, result[:path]) unless result[:count].nil?
 end
 
 if __FILE__ == $PROGRAM_NAME
