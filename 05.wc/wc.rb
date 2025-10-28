@@ -17,9 +17,13 @@ def main(args)
   results.each { print_word_count_result(format_string, _1) }
 
   if args.size >= 2
-    count_total =
-      option_chars.to_h { [_1, 0] }
-                  .merge!(*results.filter_map { _1[:count] }) { |_, total, count| total + count }
+    init_value_for_total = option_chars.to_h { [_1, 0] }
+
+    count_total = results.each_with_object(init_value_for_total) do |result, total|
+      option_chars.each do |option|
+        total[option] += result[:count][option]
+      end
+    end
 
     print_word_count_result(format_string, { path: 'total', count: count_total })
   end
@@ -85,12 +89,10 @@ def word_count_results(parsed_args, option_chars = DEFAULT_OPTION_CHARS)
   paths = parsed_args.empty? ? ['-'] : parsed_args
 
   paths.map do |path|
-    results = {}
-
-    results[:path] = path
-    results[:count] = word_count(path, option_chars)
-
-    results
+    {
+      path:,
+      count: word_count(path, option_chars)
+    }
   end
 end
 
