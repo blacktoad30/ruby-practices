@@ -6,17 +6,17 @@ require 'optparse'
 OPTION_STRING = 'lwc'
 DEFAULT_OPTION_CHARS = OPTION_STRING.chars.freeze
 
-def main(args)
-  options = OptionParser.getopts(args, OPTION_STRING)
+def main
+  options, paths = parse_commandline_options
 
   option_chars = extract_option_chars(options)
 
-  format_string = generate_format_string(args, option_chars)
-  results = word_count_results(args, option_chars)
+  format_string = generate_format_string(paths, option_chars)
+  results = word_count_results(paths, option_chars)
 
   results.each { print_word_count_result(format_string, _1) }
 
-  if args.size >= 2
+  if paths.size >= 2
     init_value_for_total = option_chars.to_h { [_1, 0] }
 
     count_total = results.each_with_object(init_value_for_total) do |result, total|
@@ -31,6 +31,12 @@ def main(args)
   0
 end
 
+def parse_commandline_options
+  options = OptionParser.getopts(ARGV, OPTION_STRING)
+
+  [options, ARGV]
+end
+
 def extract_option_chars(options)
   option_chars = options.filter_map { |opt, bool| opt if bool }
 
@@ -38,22 +44,22 @@ def extract_option_chars(options)
   option_chars.empty? ? DEFAULT_OPTION_CHARS : option_chars
 end
 
-def generate_format_string(parsed_args, option_chars = DEFAULT_OPTION_CHARS)
+def generate_format_string(paths, option_chars = DEFAULT_OPTION_CHARS)
   enabled_option_count = option_chars.size
 
-  need_padding = enabled_option_count >= 2 || parsed_args.size >= 2
+  need_padding = enabled_option_count >= 2 || paths.size >= 2
 
-  digit = need_padding ? calc_digit(parsed_args) : 1
+  digit = need_padding ? calc_digit(paths) : 1
 
   format_string = Array.new(enabled_option_count, "%#{digit}d")
 
-  format_string << '%s' unless parsed_args.empty?
+  format_string << '%s' unless paths.empty?
 
   format_string.join(' ')
 end
 
-def calc_digit(parsed_args)
-  paths = parsed_args.empty? ? ['-'] : parsed_args
+def calc_digit(paths)
+  paths = paths.empty? ? ['-'] : paths
 
   default_digit = paths.any? { exist_non_regular_file?(_1) } ? 7 : 1
   total_bytes_digit = paths.sum { regular_file_size(_1) }.to_s.size
@@ -85,8 +91,8 @@ def size(path)
   stdin?(path) ? $stdin.stat.size : FileTest.size(path)
 end
 
-def word_count_results(parsed_args, option_chars = DEFAULT_OPTION_CHARS)
-  paths = parsed_args.empty? ? ['-'] : parsed_args
+def word_count_results(paths, option_chars = DEFAULT_OPTION_CHARS)
+  paths = paths.empty? ? ['-'] : paths
 
   paths.map do |path|
     {
@@ -130,7 +136,7 @@ def print_word_count_result(format_string, result)
 end
 
 if __FILE__ == $PROGRAM_NAME
-  errno = main(ARGV)
+  errno = main
 
   exit(errno)
 end
