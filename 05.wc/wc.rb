@@ -59,60 +59,26 @@ def generate_format_string(paths, option_chars = DEFAULT_OPTION_CHARS)
 end
 
 def calc_digit(paths)
-  paths = paths.empty? ? ['-'] : paths
+  return 7 if paths.empty?
 
-  default_digit = paths.any? { exist_non_regular_file?(_1) } ? 7 : 1
-  total_bytes_digit = paths.sum { regular_file_size(_1) }.to_s.size
-
-  [default_digit, total_bytes_digit].max
-end
-
-def stdin?(path)
-  path == '-'
-end
-
-def exist_non_regular_file?(path)
-  exist?(path) && !file?(path)
-end
-
-def exist?(path)
-  stdin?(path) || FileTest.exist?(path)
-end
-
-def regular_file_size(path)
-  file?(path) ? size(path) : 0
-end
-
-def file?(path)
-  stdin?(path) ? $stdin.stat.file? : FileTest.file?(path)
-end
-
-def size(path)
-  stdin?(path) ? $stdin.stat.size : FileTest.size(path)
+  paths.sum { FileTest.size(_1) }.to_s.size
 end
 
 def word_count_results(paths, option_chars = DEFAULT_OPTION_CHARS)
-  paths = paths.empty? ? ['-'] : paths
+  return [word_count('', option_chars)] if paths.empty?
 
-  paths.map do |path|
-    {
-      path:,
-      count: word_count(path, option_chars)
-    }
-  end
+  paths.map { word_count(_1, option_chars) }
 end
 
 def word_count(path, option_chars = DEFAULT_OPTION_CHARS)
-  arg_path = stdin?(path) ? 0 : path
-
-  buf = File.open(arg_path, encoding: 'ASCII-8BIT', &:read)
+  buf = path.empty? ? $stdin.set_encoding('ASCII-8BIT').read : File.open(path, encoding: 'ASCII-8BIT', &:read)
   word_count = {}
 
   word_count['l'] = count_newline(buf) if option_chars.include?('l')
   word_count['w'] = count_word(buf) if option_chars.include?('w')
-  word_count['c'] = (file?(path) ? size(path) : count_bytesize(buf)) if option_chars.include?('c')
+  word_count['c'] = count_bytesize(buf) if option_chars.include?('c')
 
-  word_count
+  { path:, count: word_count }
 end
 
 def count_newline(buf)
