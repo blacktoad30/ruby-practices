@@ -105,30 +105,28 @@ end
 def word_count(path, option_chars = DEFAULT_OPTION_CHARS)
   arg_path = stdin?(path) ? 0 : path
 
-  lines = File.open(arg_path, encoding: 'ASCII-8BIT', &:readlines)
+  buf = File.open(arg_path, encoding: 'ASCII-8BIT', &:read)
   word_count = {}
 
-  word_count['l'] = count_newline(lines) if option_chars.include?('l')
-  word_count['w'] = count_word(lines) if option_chars.include?('w')
-  word_count['c'] = (file?(path) ? size(path) : count_bytesize(lines)) if option_chars.include?('c')
+  word_count['l'] = count_newline(buf) if option_chars.include?('l')
+  word_count['w'] = count_word(buf) if option_chars.include?('w')
+  word_count['c'] = (file?(path) ? size(path) : count_bytesize(buf)) if option_chars.include?('c')
 
   word_count
 end
 
-def count_newline(lines)
-  lines.sum { |line| line.count("\n") }
+def count_newline(buf)
+  buf.count("\n")
 end
 
-def count_word(lines)
-  lines.sum do |line|
-    num = 0
-    line.split { num += 1 if _1.match?(/[[:graph:]]/) }
-    num
-  end
+def count_word(buf)
+  num = 0
+  buf.split { num += 1 if _1.match?(/[[:graph:]]/) }
+  num
 end
 
-def count_bytesize(lines)
-  lines.sum(&:bytesize)
+def count_bytesize(buf)
+  buf.bytesize
 end
 
 def print_word_count_result(format_string, result)
