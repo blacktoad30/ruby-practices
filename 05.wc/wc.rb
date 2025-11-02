@@ -10,23 +10,9 @@ def main
   options, paths = parse_commandline_options
 
   option_chars = extract_option_chars(options)
+  counts = paths.empty? ? [count_newline_word_bytesize] : paths.map { count_newline_word_bytesize(_1) }
 
-  format_string = generate_format_string(paths, option_chars)
-  results = word_count_results(paths, option_chars)
-
-  results.each { print_word_count_result(format_string, _1) }
-
-  if paths.size >= 2
-    init_value_for_total = option_chars.to_h { [_1, 0] }
-
-    count_total = results.each_with_object(init_value_for_total) do |result, total|
-      option_chars.each do |option|
-        total[option] += result[:count][option]
-      end
-    end
-
-    print_word_count_result(format_string, { path: 'total', count: count_total })
-  end
+  print_counts(counts, option_chars)
 
   0
 end
@@ -44,41 +30,15 @@ def extract_option_chars(options)
   option_chars.empty? ? DEFAULT_OPTION_CHARS : option_chars
 end
 
-def generate_format_string(paths, option_chars = DEFAULT_OPTION_CHARS)
-  enabled_option_count = option_chars.size
-
-  need_padding = enabled_option_count >= 2 || paths.size >= 2
-
-  digit = need_padding ? calc_digit(paths) : 1
-
-  format_string = Array.new(enabled_option_count, "%#{digit}d")
-
-  format_string << '%s' unless paths.empty?
-
-  format_string.join(' ')
-end
-
-def calc_digit(paths)
-  return 7 if paths.empty?
-
-  paths.sum { FileTest.size(_1) }.to_s.size
-end
-
-def word_count_results(paths, option_chars = DEFAULT_OPTION_CHARS)
-  return [word_count('', option_chars)] if paths.empty?
-
-  paths.map { word_count(_1, option_chars) }
-end
-
-def word_count(path, option_chars = DEFAULT_OPTION_CHARS)
+def count_newline_word_bytesize(path = '')
   buf = path.empty? ? $stdin.set_encoding('ASCII-8BIT').read : File.open(path, encoding: 'ASCII-8BIT', &:read)
-  word_count = {}
+  count = {}
 
-  word_count['l'] = count_newline(buf) if option_chars.include?('l')
-  word_count['w'] = count_word(buf) if option_chars.include?('w')
-  word_count['c'] = count_bytesize(buf) if option_chars.include?('c')
+  count['l'] = count_newline(buf)
+  count['w'] = count_word(buf)
+  count['c'] = count_bytesize(buf)
 
-  { path:, count: word_count }
+  { path:, count: }
 end
 
 def count_newline(buf)
@@ -95,8 +55,44 @@ def count_bytesize(buf)
   buf.bytesize
 end
 
-def print_word_count_result(format_string, result)
-  puts format(format_string, *result[:count].values, result[:path]) unless result[:count].nil?
+def print_counts(counts, option_chars)
+  digit = calc_digit(counts, option_chars)
+  need_with_path = !stdin?(counts)
+
+  counts << total_counts(counts) if counts.size >= 2
+
+  counts.each do |result|
+    counts = result[:count].values_at(*option_chars).map { _1.to_s.rjust(digit) }
+
+    counts << result[:path] if need_with_path
+
+    puts counts.join(' ')
+  end
+end
+
+def calc_digit(counts, option_chars)
+  need_padding = option_chars.size >= 2 || counts.size >= 2
+
+  return 1 unless need_padding
+  return 7 if stdin?(counts)
+
+  counts.sum { _1[:count]['c'] }.to_s.size
+end
+
+def stdin?(counts)
+  counts.size == 1 && counts.first[:path].empty?
+end
+
+def total_counts(counts)
+  init_value_for_total = DEFAULT_OPTION_CHARS.to_h { [_1, 0] }
+
+  count_total = counts.each_with_object(init_value_for_total) do |result, total|
+    DEFAULT_OPTION_CHARS.each do |option|
+      total[option] += result[:count][option]
+    end
+  end
+
+  { path: 'total', count: count_total }
 end
 
 if __FILE__ == $PROGRAM_NAME
